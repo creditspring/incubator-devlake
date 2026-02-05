@@ -78,7 +78,7 @@ func CollectTodolists(taskCtx plugin.SubTaskContext) errors.Error {
 		taskCtx.GetLogger().Info("No project age limit configured, collecting todolists from all projects")
 		err = db.All(&projects,
 			dal.From(&models.BasecampProject{}),
-			dal.Where("connection_id = ? AND todoset_ids != ''", data.Options.ConnectionId),
+			dal.Where("connection_id = ? AND todoset_ids != '' AND project_id = '45992106'", data.Options.ConnectionId),
 		)
 	} else {
 		cutoffDate := data.now().AddDate(0, -ageLimitMonths, 0)
@@ -88,13 +88,13 @@ func CollectTodolists(taskCtx plugin.SubTaskContext) errors.Error {
 			taskCtx.GetLogger().Info("Including %d permanent project IDs in todolist collection", len(permanentIds))
 			err = db.All(&projects,
 				dal.From(&models.BasecampProject{}),
-				dal.Where("connection_id = ? AND todoset_ids != '' AND (created_at > ? OR project_id IN ?)",
+				dal.Where("connection_id = ? AND todoset_ids != '' AND project_id = '45992106' AND (created_at > ? OR project_id IN ?)",
 					data.Options.ConnectionId, cutoffDate, permanentIds),
 			)
 		} else {
 			err = db.All(&projects,
 				dal.From(&models.BasecampProject{}),
-				dal.Where("connection_id = ? AND todoset_ids != '' AND created_at > ?",
+				dal.Where("connection_id = ? AND todoset_ids != '' AND project_id = '45992106' AND created_at > ?",
 					data.Options.ConnectionId, cutoffDate),
 			)
 		}
