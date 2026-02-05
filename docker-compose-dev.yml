@@ -79,7 +79,7 @@ services:
       - mysql
 
   devlake:
-    image: devlake.docker.scarf.sh/apache/devlake:latest
+    # image: devlake.docker.scarf.sh/apache/devlake:latest
     build:
       context: backend
       args:
@@ -100,7 +100,7 @@ services:
       - mysql
 
   config-ui:
-    image: devlake.docker.scarf.sh/apache/devlake-config-ui:latest
+    # image: devlake.docker.scarf.sh/apache/devlake-config-ui:latest
     build:
       context: "config-ui"
     ports:
