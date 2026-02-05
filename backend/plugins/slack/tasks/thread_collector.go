@@ -19,6 +19,7 @@ package tasks
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -43,11 +44,18 @@ type ThreadInput struct {
 func CollectThread(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*SlackTaskData)
 	db := taskCtx.GetDal()
+	syncPolicy := taskCtx.TaskContext().SyncPolicy()
 
 	clauses := []dal.Clause{
 		dal.Select("DISTINCT CASE WHEN thread_ts = '' OR thread_ts IS NULL THEN ts ELSE thread_ts END AS thread_ts, channel_id"),
 		dal.From("_tool_slack_channel_messages"),
 		dal.Where("connection_id = ? AND channel_id = ? AND reply_count > 0 AND (subtype = '' OR subtype IS NULL)", data.Options.ConnectionId, data.Options.ChannelId),
+	}
+
+	// Add time filter if SyncPolicy has TimeAfter
+	if syncPolicy != nil && syncPolicy.TimeAfter != nil {
+		oldestTs := fmt.Sprintf("%d", syncPolicy.TimeAfter.Unix())
+		clauses = append(clauses, dal.Where("ts >= ?", oldestTs))
 	}
 
 	// construct the input iterator
