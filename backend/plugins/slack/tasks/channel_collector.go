@@ -62,6 +62,7 @@ func CollectChannel(taskCtx plugin.SubTaskContext) errors.Error {
 		Query: func(reqData *api.RequestData) (url.Values, errors.Error) {
 			query := url.Values{}
 			query.Set("limit", strconv.Itoa(pageSize))
+			query.Set("types", "public_channel,private_channel")
 			if pageToken, ok := reqData.CustomData.(string); ok && pageToken != "" {
 				query.Set("cursor", reqData.CustomData.(string))
 			}

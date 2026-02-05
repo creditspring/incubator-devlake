@@ -19,13 +19,14 @@ package tasks
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
-	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/slack/apimodels"
 )
 
@@ -39,34 +40,39 @@ type ChannelInput struct {
 
 func CollectChannelMessage(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*SlackTaskData)
+
+	// Create stateful collector to get timeAfter from SyncPolicy
+	apiCollector, err := helper.NewStatefulApiCollector(helper.RawDataSubTaskArgs{
+		Ctx:     taskCtx,
+		Options: data.Options,
+		Table:   RAW_CHANNEL_MESSAGE_TABLE,
+	})
+	if err != nil {
+		return err
+	}
+
 	// Build a single-item iterator for the specific channel passed in options
-	iterator := api.NewQueueIterator()
+	iterator := helper.NewQueueIterator()
 	iterator.Push(&ChannelInput{ChannelId: data.Options.ChannelId})
 
 	pageSize := 100
-	collector, err := api.NewApiCollector(api.ApiCollectorArgs{
-		RawDataSubTaskArgs: api.RawDataSubTaskArgs{
-			Ctx:     taskCtx,
-			Options: data.Options,
-			Table:   RAW_CHANNEL_MESSAGE_TABLE,
-		},
+	err = apiCollector.InitCollector(helper.ApiCollectorArgs{
 		ApiClient:   data.ApiClient,
-		Incremental: false,
 		Input:       iterator,
 		UrlTemplate: "conversations.history",
 		PageSize:    pageSize,
-		GetNextPageCustomData: func(prevReqData *api.RequestData, prevPageResponse *http.Response) (interface{}, errors.Error) {
+		GetNextPageCustomData: func(prevReqData *helper.RequestData, prevPageResponse *http.Response) (interface{}, errors.Error) {
 			res := apimodels.SlackChannelMessageApiResult{}
-			err := api.UnmarshalResponse(prevPageResponse, &res)
+			err := helper.UnmarshalResponse(prevPageResponse, &res)
 			if err != nil {
 				return nil, err
 			}
 			if res.ResponseMetadata.NextCursor == "" {
-				return nil, api.ErrFinishCollect
+				return nil, helper.ErrFinishCollect
 			}
 			return res.ResponseMetadata.NextCursor, nil
 		},
-		Query: func(reqData *api.RequestData) (url.Values, errors.Error) {
+		Query: func(reqData *helper.RequestData) (url.Values, errors.Error) {
 			input := reqData.Input.(*ChannelInput)
 			query := url.Values{}
 			query.Set("channel", input.ChannelId)
@@ -74,11 +80,15 @@ func CollectChannelMessage(taskCtx plugin.SubTaskContext) errors.Error {
 			if pageToken, ok := reqData.CustomData.(string); ok && pageToken != "" {
 				query.Set("cursor", reqData.CustomData.(string))
 			}
+			// Add oldest parameter if timeAfter is set in SyncPolicy
+			if apiCollector.GetSince() != nil {
+				query.Set("oldest", fmt.Sprintf("%d", apiCollector.GetSince().Unix()))
+			}
 			return query, nil
 		},
 		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
 			body := &apimodels.SlackChannelMessageApiResult{}
-			err := api.UnmarshalResponse(res, body)
+			err := helper.UnmarshalResponse(res, body)
 			if err != nil {
 				return nil, err
 			}
@@ -89,7 +99,7 @@ func CollectChannelMessage(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	return collector.Execute()
+	return apiCollector.Execute()
 }
 
 var CollectChannelMessageMeta = plugin.SubTaskMeta{
