@@ -27,6 +27,10 @@ const URLS = {
       BASIS: 'https://devlake.apache.org/docs/Configuration/ArgoCD',
       TRANSFORMATION: 'https://devlake.apache.org/docs/Configuration/ArgoCD#step-3---adding-transformation-rules-optional',
     },
+    BASECAMP: {
+      BASIS: 'https://devlake.apache.org/docs/Configuration/Basecamp',
+      TRANSFORMATION: 'https://devlake.apache.org/docs/Configuration/Basecamp#step-3---adding-transformation-rules-optional',
+    },
     AZUREDEVOPS: {
       BASIS: 'https://devlake.apache.org/docs/Configuration/AzureDevOps',
       RATE_LIMIT: 'https://devlake.apache.org/docs/Configuration/AzureDevOps/#custom-rate-limit-optional',

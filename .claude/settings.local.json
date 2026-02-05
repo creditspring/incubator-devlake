@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(docker-compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(go build:*)",
+      "Bash(docker build:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker ps:*)",
+      "Bash(find:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(./devops/releases/latest/refresh_token.sh:*)"
+    ]
+  }
+}

@@ -35,6 +35,7 @@ import { TapdTransformation } from '@/plugins/register/tapd';
 import { BambooTransformation } from '@/plugins/register/bamboo';
 import { CircleCITransformation } from '@/plugins/register/circleci';
 import { ArgoCDTransformation } from '@/plugins/register/argocd';
+import { BasecampTransformation } from '@/plugins/register/basecamp';
 import { DOC_URL } from '@/release';
 import { operator } from '@/utils';
 
@@ -220,6 +221,14 @@ export const ScopeConfigForm = ({
 
               {plugin === 'bamboo' && (
                 <BambooTransformation
+                  entities={entities}
+                  transformation={transformation}
+                  setTransformation={setTransformation}
+                />
+              )}
+
+              {plugin === 'basecamp' && (
+                <BasecampTransformation
                   entities={entities}
                   transformation={transformation}
                   setTransformation={setTransformation}
