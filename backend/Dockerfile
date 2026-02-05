@@ -27,9 +27,9 @@ FROM --platform=linux/amd64 debian:bookworm as debian-amd64
 RUN apt-get update
 RUN apt-get install -y libssh2-1-dev libssl-dev zlib1g-dev
 
-FROM --platform=linux/arm64 debian:bookworm as debian-arm64
-RUN apt-get update
-RUN apt-get install -y libssh2-1-dev libssl-dev zlib1g-dev
+#FROM --platform=linux/arm64 debian:bookworm as debian-arm64
+#RUN apt-get update
+#RUN apt-get install -y libssh2-1-dev libssl-dev zlib1g-dev
 
 FROM --platform=$BUILDPLATFORM golang:1.20.5-bookworm as builder
 
@@ -56,9 +56,9 @@ COPY --from=debian-amd64 /usr/include /rootfs-amd64/usr/include
 COPY --from=debian-amd64 /usr/lib/x86_64-linux-gnu /rootfs-amd64/usr/lib/x86_64-linux-gnu
 COPY --from=debian-amd64 /lib/x86_64-linux-gnu /rootfs-amd64/lib/x86_64-linux-gnu
 
-COPY --from=debian-arm64 /usr/include /rootfs-arm64/usr/include
-COPY --from=debian-arm64 /usr/lib/aarch64-linux-gnu /rootfs-arm64/usr/lib/aarch64-linux-gnu
-COPY --from=debian-arm64 /lib/aarch64-linux-gnu /rootfs-arm64/lib/aarch64-linux-gnu
+#COPY --from=debian-arm64 /usr/include /rootfs-arm64/usr/include
+#COPY --from=debian-arm64 /usr/lib/aarch64-linux-gnu /rootfs-arm64/usr/lib/aarch64-linux-gnu
+#COPY --from=debian-arm64 /lib/aarch64-linux-gnu /rootfs-arm64/lib/aarch64-linux-gnu
 
 
 RUN for arch in aarch64 x86_64 ; do \
@@ -149,6 +149,7 @@ RUN python3 -m pip install --no-cache --upgrade pip setuptools && \
     python3 -m pip install --upgrade pip
 
 # Setup Python Poetry package manager
+ENV POETRY_VERSION=2.2.1
 RUN curl -sSL https://install.python-poetry.org | python3 -
 ENV PATH="$PATH:/app/.local/bin"
 
