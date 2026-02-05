@@ -34,16 +34,17 @@ type BasecampConn struct {
 	AccountId             string `mapstructure:"accountId" validate:"required" json:"accountId" gorm:"type:varchar(255)"`
 
 	// OAuth2 fields for automatic token refresh
-	ClientId       string    `mapstructure:"clientId" json:"clientId" gorm:"type:varchar(255)"`
-	ClientSecret   string    `mapstructure:"clientSecret" json:"clientSecret" gorm:"type:text;serializer:encdec"`
-	RefreshToken   string    `mapstructure:"refreshToken" json:"refreshToken" gorm:"type:text;serializer:encdec"`
-	TokenExpiresAt time.Time `mapstructure:"tokenExpiresAt" json:"tokenExpiresAt"`
+	ClientId       string     `mapstructure:"clientId" json:"clientId" gorm:"type:varchar(255)"`
+	ClientSecret   string     `mapstructure:"clientSecret" json:"clientSecret" gorm:"type:text;serializer:encdec"`
+	RefreshToken   string     `mapstructure:"refreshToken" json:"refreshToken" gorm:"type:text;serializer:encdec"`
+	TokenExpiresAt *time.Time `mapstructure:"tokenExpiresAt" json:"tokenExpiresAt"`
 }
 
 // UpdateToken updates the access token and expiry time
 func (bc *BasecampConn) UpdateToken(newToken string, expiresIn int) {
 	bc.Token = newToken
-	bc.TokenExpiresAt = time.Now().Add(time.Duration(expiresIn) * time.Second)
+	expiresAt := time.Now().Add(time.Duration(expiresIn) * time.Second)
+	bc.TokenExpiresAt = &expiresAt
 }
 
 func (bc *BasecampConn) Sanitize() BasecampConn {

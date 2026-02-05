@@ -18,29 +18,21 @@ limitations under the License.
 package migrationscripts
 
 import (
-	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/errors"
 )
 
-// All return all the migration scripts
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables),
-		new(addOAuth2Fields),
-		new(addAccountScope),
-		new(addProjectCreatedAt),
-		new(addPrReferences),
-		new(addTodolistGroups),
-		new(addPermanentProjectIds),
-		new(addScopeConfigFields),
-		new(addTodosetIds),
-		new(addProjectAgeLimit),
-		new(addTodoAgeLimit),
-		new(removeTodosetId),
-		new(addTodoComments),
-		new(enlargeCommentContent),
-		new(addTodolistGroupTimestamps),
-		new(addTodoEvents),
-		new(redesignPrReferences),
-		new(fixTokenExpiresAt),
-	}
+type fixTokenExpiresAt struct{}
+
+func (*fixTokenExpiresAt) Up(basicRes context.BasicRes) errors.Error {
+	db := basicRes.GetDal()
+	return db.Exec("ALTER TABLE _tool_basecamp_connections MODIFY COLUMN token_expires_at DATETIME NULL")
+}
+
+func (*fixTokenExpiresAt) Version() uint64 {
+	return 20260146000001
+}
+
+func (*fixTokenExpiresAt) Name() string {
+	return "fix token_expires_at column to allow NULL values"
 }

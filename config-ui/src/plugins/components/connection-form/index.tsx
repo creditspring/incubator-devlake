@@ -74,6 +74,10 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
               dbUrl: isEqual(connection?.dbUrl, values.dbUrl) ? undefined : values.dbUrl,
               companyId: isEqual(connection?.companyId, values.companyId) ? undefined : values.companyId,
               organization: isEqual(connection?.organization, values.organization) ? undefined : values.organization,
+              accountId: isEqual(connection?.accountId, values.accountId) ? undefined : values.accountId,
+              clientId: isEqual(connection?.clientId, values.clientId) ? undefined : values.clientId,
+              clientSecret: isEqual(connection?.clientSecret, values.clientSecret) ? undefined : values.clientSecret,
+              refreshToken: isEqual(connection?.refreshToken, values.refreshToken) ? undefined : values.refreshToken,
             })
           : API.connection.testOld(
               plugin,
@@ -99,6 +103,10 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
                 'dbUrl',
                 'companyId',
                 'organization',
+                'accountId',
+                'clientId',
+                'clientSecret',
+                'refreshToken',
               ]),
             ),
       {

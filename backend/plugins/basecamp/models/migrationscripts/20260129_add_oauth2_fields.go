@@ -26,10 +26,10 @@ import (
 )
 
 type basecampConnection20260129 struct {
-	ClientId       string `gorm:"type:varchar(255)"`
-	ClientSecret   string `gorm:"type:text;serializer:encdec"`
-	RefreshToken   string `gorm:"type:text;serializer:encdec"`
-	TokenExpiresAt time.Time
+	ClientId       string     `gorm:"type:varchar(255)"`
+	ClientSecret   string     `gorm:"type:text;serializer:encdec"`
+	RefreshToken   string     `gorm:"type:text;serializer:encdec"`
+	TokenExpiresAt *time.Time `gorm:"type:datetime"`
 }
 
 func (basecampConnection20260129) TableName() string {

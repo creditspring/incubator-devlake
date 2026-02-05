@@ -82,6 +82,11 @@ func (tp *TokenProvider) needsRefresh() bool {
 		return false
 	}
 
+	// No expiry time means we don't know when to refresh - let API call fail first
+	if tp.conn.TokenExpiresAt == nil {
+		return false
+	}
+
 	buffer := DefaultRefreshBuffer
 	if envBuffer := os.Getenv("BASECAMP_TOKEN_REFRESH_BUFFER_MINUTES"); envBuffer != "" {
 		if val, err := strconv.Atoi(envBuffer); err == nil {
@@ -89,7 +94,7 @@ func (tp *TokenProvider) needsRefresh() bool {
 		}
 	}
 
-	return time.Now().Add(buffer).After(tp.conn.TokenExpiresAt)
+	return time.Now().Add(buffer).After(*tp.conn.TokenExpiresAt)
 }
 
 // refreshToken performs the OAuth2 token refresh with 37signals

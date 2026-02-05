@@ -29,6 +29,8 @@ var vld *validator.Validate
 var basicRes context.BasicRes
 
 var dsHelper *api.DsHelper[models.BasecampConnection, models.BasecampAccount, models.BasecampScopeConfig]
+var raProxy *api.DsRemoteApiProxyHelper[models.BasecampConnection]
+var raScopeList *api.DsRemoteApiScopeListHelper[models.BasecampConnection, models.BasecampAccount, BasecampRemotePagination]
 
 func Init(br context.BasicRes, p plugin.PluginMeta) {
 	basicRes = br
@@ -45,4 +47,6 @@ func Init(br context.BasicRes, p plugin.PluginMeta) {
 		nil,
 		nil,
 	)
+	raProxy = api.NewDsRemoteApiProxyHelper[models.BasecampConnection](dsHelper.ConnApi.ModelApiHelper)
+	raScopeList = api.NewDsRemoteApiScopeListHelper[models.BasecampConnection, models.BasecampAccount, BasecampRemotePagination](raProxy, listBasecampRemoteScopes)
 }
