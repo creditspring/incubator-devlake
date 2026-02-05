@@ -1,0 +1,524 @@
+classDiagram
+    direction TB
+
+    %% ===== EXTERNAL/HELPER TYPES =====
+    class `helper.RestConnection` {
+        <<external>>
+    }
+    class `helper.AccessToken` {
+        <<external>>
+        +Token string
+    }
+    class `helper.BaseConnection` {
+        <<external>>
+        +ID uint64
+        +Name string
+    }
+    class `common.Scope` {
+        <<external>>
+        +ConnectionId uint64
+    }
+    class `common.ScopeConfig` {
+        <<external>>
+        +ConnectionId uint64
+        +ScopeId string
+    }
+    class `common.NoPKModel` {
+        <<external>>
+    }
+
+    %% ===== CONNECTION MODELS =====
+    class BasecampConn {
+        +AccountId string
+        +ClientId string
+        +ClientSecret string
+        +RefreshToken string
+        +TokenExpiresAt time.Time
+        +UpdateToken(newToken, expiresIn)
+        +Sanitize() BasecampConn
+        +SetupAuthentication(req)
+    }
+
+    class BasecampConnection {
+        +MergeFromRequest(target, body)
+        +Sanitize() BasecampConnection
+        +TableName() string
+    }
+
+    %% ===== SCOPE MODELS =====
+    class BasecampAccount {
+        <<ToolLayerScope>>
+        +AccountId string
+        +Name string
+        +ScopeId() string
+        +ScopeName() string
+        +ScopeFullName() string
+        +ScopeParams() BasecampApiParams
+        +TableName() string
+    }
+
+    class BasecampScopeConfig {
+        +TodoUrls string
+        +PermanentProjectIds string
+        +ProjectAgeLimitMonths int
+        +TodoAgeLimitMonths int
+        +TableName() string
+        +SetConnectionId(c, connectionId)
+    }
+
+    %% ===== DOMAIN MODELS =====
+    class BasecampProject {
+        +ConnectionId uint64
+        +ProjectId string
+        +Name string
+        +TodosetIds string
+        +CreatedAt *time.Time
+        +TableName() string
+    }
+
+    class BasecampTodolist {
+        +ConnectionId uint64
+        +TodolistId string
+        +ProjectId string
+        +Name string
+        +TodosUrl string
+        +TableName() string
+    }
+
+    class BasecampTodolistGroup {
+        +ConnectionId uint64
+        +GroupId string
+        +TodolistId string
+        +ProjectId string
+        +Name string
+        +TodosUrl string
+        +TableName() string
+    }
+
+    class BasecampTodo {
+        +ConnectionId uint64
+        +TodoId string
+        +ProjectId string
+        +ProjectName string
+        +TodoListId string
+        +Title string
+        +Status string
+        +Completed bool
+        +Url string
+        +CreatorId string
+        +CreatorName string
+        +AssigneeId string
+        +AssigneeName string
+        +CreatedAt *time.Time
+        +UpdatedAt *time.Time
+        +CompletedAt *time.Time
+        +TableName() string
+    }
+
+    class BasecampTodoComment {
+        +ConnectionId uint64
+        +CommentId string
+        +TodoId string
+        +ProjectId string
+        +Content string
+        +CreatorId string
+        +CreatorName string
+        +CreatorEmail string
+        +CreatedAt *time.Time
+        +UpdatedAt *time.Time
+        +TableName() string
+    }
+
+    class BasecampTodoEvent {
+        +ConnectionId uint64
+        +EventId string
+        +TodoId string
+        +ProjectId string
+        +Action string
+        +CreatorId string
+        +CreatorName string
+        +CreatedAt *time.Time
+        +Details string
+        +TableName() string
+    }
+
+    class PrReference {
+        +Id uint64
+        +ConnectionId uint64
+        +PullRequestId string
+        +Url string
+        +TableName() string
+    }
+
+    %% ===== TASK DATA =====
+    class BasecampOptions {
+        +ConnectionId uint64
+        +AccountId string
+        +ScopeConfigId uint64
+    }
+
+    class BasecampTaskData {
+        +Options *BasecampOptions
+        +ApiClient *api.ApiAsyncClient
+        +AccountId string
+        +ScopeConfig *BasecampScopeConfig
+    }
+
+    class BasecampApiParams {
+        +ConnectionId uint64
+        +AccountId string
+    }
+
+    %% ===== API RESPONSE STRUCTS =====
+    class BasecampApiProject {
+        <<api response>>
+        +ID int64
+        +Name string
+        +CreatedAt string
+        +Dock []DockItem
+    }
+
+    class BasecampApiTodolist {
+        <<api response>>
+        +ID int64
+        +Name string
+        +TodosUrl string
+        +Bucket BucketRef
+    }
+
+    class BasecampApiTodo {
+        <<api response>>
+        +ID int64
+        +Title string
+        +Status string
+        +Completed bool
+        +AppUrl string
+        +UpdatedAt string
+        +Creator PersonRef
+        +Assignees []PersonRef
+    }
+
+    class BasecampApiGroup {
+        <<api response>>
+        +ID int64
+        +Name string
+        +Parent ParentRef
+        +Bucket BucketRef
+        +TodosUrl string
+    }
+
+    class BasecampApiComment {
+        <<api response>>
+        +ID int64
+        +Content string
+        +CreatedAt string
+        +UpdatedAt string
+        +Creator CreatorRef
+        +Parent ParentRef
+        +Bucket BucketRef
+    }
+
+    class BasecampApiEvent {
+        <<api response>>
+        +ID int64
+        +Action string
+        +CreatedAt string
+        +Creator CreatorRef
+        +Recording RecordingRef
+    }
+
+    %% ===== TOKEN MANAGEMENT =====
+    class TokenProvider {
+        -conn *BasecampConnection
+        -dal dal.Dal
+        -httpClient *http.Client
+        -logger log.Logger
+        -mu sync.Mutex
+        +GetToken() string
+        +ForceRefresh(oldToken)
+        -needsRefresh() bool
+        -refreshToken()
+    }
+
+    class RefreshRoundTripper {
+        <<http.RoundTripper>>
+        -base http.RoundTripper
+        -tokenProvider *TokenProvider
+        +RoundTrip(req) Response
+        -roundTripWithRetry(req, refreshAttempted)
+    }
+
+    %% ===== ITERATOR INPUTS =====
+    class ProjectInput {
+        +ProjectId string
+        +TodosetId string
+    }
+
+    class TodolistInput {
+        +ProjectId string
+        +TodolistId string
+        +FetchComplete bool
+    }
+
+    class TodolistForGroupInput {
+        +ProjectId string
+        +TodolistId string
+    }
+
+    class TodoInput {
+        +TodoId string
+        +ProjectId string
+    }
+
+    %% ===== SUBTASKS =====
+    class CleanupDataMeta {
+        <<SubTaskMeta>>
+        +Name: CleanupData
+        +EntryPoint: CleanupData
+        +EnabledByDefault: true
+        Note: Deletes existing data before sync
+    }
+
+    class CollectProjectsMeta {
+        <<SubTaskMeta>>
+        +Name: collect_projects
+        +EntryPoint: CollectProjects
+        +EnabledByDefault: true
+    }
+
+    class ExtractProjectsMeta {
+        <<SubTaskMeta>>
+        +Name: extract_projects
+        +EntryPoint: ExtractProjects
+        +EnabledByDefault: true
+    }
+
+    class CollectTodolistsMeta {
+        <<SubTaskMeta>>
+        +Name: collect_todolists
+        +EntryPoint: CollectTodolists
+        +EnabledByDefault: true
+        Note: Filters by ProjectAgeLimitMonths
+        Note: Supports PermanentProjectIds
+        Note: Iterates ALL todosets per project
+    }
+
+    class ExtractTodolistsMeta {
+        <<SubTaskMeta>>
+        +Name: extract_todolists
+        +EntryPoint: ExtractTodolists
+        +EnabledByDefault: true
+    }
+
+    class CollectGroupsMeta {
+        <<SubTaskMeta>>
+        +Name: collect_groups
+        +EntryPoint: CollectGroups
+        +EnabledByDefault: true
+    }
+
+    class ExtractGroupsMeta {
+        <<SubTaskMeta>>
+        +Name: extract_groups
+        +EntryPoint: ExtractGroups
+        +EnabledByDefault: true
+    }
+
+    class CollectTodosMeta {
+        <<SubTaskMeta>>
+        +Name: collect_todos
+        +EntryPoint: CollectTodos
+        +EnabledByDefault: true
+    }
+
+    class ExtractTodosMeta {
+        <<SubTaskMeta>>
+        +Name: extract_todos
+        +EntryPoint: ExtractTodos
+        +EnabledByDefault: true
+        Note: Filters by TodoAgeLimitMonths
+    }
+
+    class CollectCommentsMeta {
+        <<SubTaskMeta>>
+        +Name: CollectComments
+        +EntryPoint: CollectComments
+        +EnabledByDefault: true
+    }
+
+    class ExtractCommentsMeta {
+        <<SubTaskMeta>>
+        +Name: ExtractComments
+        +EntryPoint: ExtractComments
+        +EnabledByDefault: true
+    }
+
+    class CollectEventsMeta {
+        <<SubTaskMeta>>
+        +Name: CollectEvents
+        +EntryPoint: CollectEvents
+        +EnabledByDefault: true
+    }
+
+    class ExtractEventsMeta {
+        <<SubTaskMeta>>
+        +Name: ExtractEvents
+        +EntryPoint: ExtractEvents
+        +EnabledByDefault: true
+    }
+
+    class UpdateTodoCompletionMeta {
+        <<SubTaskMeta>>
+        +Name: UpdateTodoCompletion
+        +EntryPoint: UpdateTodoCompletion
+        +EnabledByDefault: true
+        Note: Updates CompletedAt from events
+    }
+
+    class ConvertProjectsMeta {
+        <<SubTaskMeta>>
+        +Name: convert_projects
+        +EntryPoint: ConvertProjects
+        +EnabledByDefault: true
+    }
+
+    class ConvertTodosMeta {
+        <<SubTaskMeta>>
+        +Name: convert_todos
+        +EntryPoint: ConvertTodos
+        +EnabledByDefault: true
+    }
+
+    class ConvertCommentsMeta {
+        <<SubTaskMeta>>
+        +Name: ConvertComments
+        +EntryPoint: ConvertComments
+        +EnabledByDefault: true
+    }
+
+    class LinkPrToTodoMeta {
+        <<SubTaskMeta>>
+        +Name: link_pr_to_todo
+        +EntryPoint: LinkPrToTodo
+        +EnabledByDefault: true
+    }
+
+    %% ===== PLUGIN =====
+    class Basecamp {
+        <<Plugin>>
+        +Init(basicRes)
+        +GetTablesInfo() []Tabler
+        +Description() string
+        +Name() string
+        +SubTaskMetas() []SubTaskMeta
+        +PrepareTaskData(taskCtx, options)
+        +RootPkgPath() string
+        +MigrationScripts() []MigrationScript
+        +Connection() Tabler
+        +Scope() ToolLayerScope
+        +ScopeConfig() Tabler
+        +ApiResources() map
+        +MakeDataSourcePipelinePlanV200()
+        +Close(taskCtx)
+    }
+
+    %% ===== INHERITANCE/EMBEDDING =====
+    BasecampConn --|> `helper.RestConnection` : embeds
+    BasecampConn --|> `helper.AccessToken` : embeds
+    BasecampConnection --|> `helper.BaseConnection` : embeds
+    BasecampConnection --|> BasecampConn : embeds
+
+    BasecampAccount --|> `common.Scope` : embeds
+    BasecampScopeConfig --|> `common.ScopeConfig` : embeds
+
+    BasecampProject --|> `common.NoPKModel` : embeds
+    BasecampTodolist --|> `common.NoPKModel` : embeds
+    BasecampTodo --|> `common.NoPKModel` : embeds
+    BasecampTodolistGroup --|> `common.NoPKModel` : embeds
+    BasecampTodoComment --|> `common.NoPKModel` : embeds
+    BasecampTodoEvent --|> `common.NoPKModel` : embeds
+    PrReference --|> `common.NoPKModel` : embeds
+
+    %% ===== MODEL RELATIONSHIPS =====
+    BasecampConnection "1" --> "*" BasecampAccount : has
+    BasecampAccount "1" --> "*" BasecampProject : contains
+    BasecampProject "1" --> "*" BasecampTodolist : contains via TodosetIds
+    BasecampTodolist "1" --> "*" BasecampTodolistGroup : contains
+    BasecampTodolist "1" --> "*" BasecampTodo : contains
+    BasecampTodolistGroup "1" --> "*" BasecampTodo : contains
+    BasecampTodo "1" --> "*" BasecampTodoComment : has
+    BasecampTodo "1" --> "*" BasecampTodoEvent : has
+
+    BasecampTaskData --> BasecampOptions : uses
+    BasecampTaskData --> BasecampScopeConfig : uses
+    BasecampAccount --> BasecampApiParams : returns
+
+    TokenProvider --> BasecampConnection : manages
+    RefreshRoundTripper --> TokenProvider : uses
+
+    %% ===== SCOPE CONFIG USAGE =====
+    CollectTodolistsMeta ..> BasecampScopeConfig : reads ProjectAgeLimitMonths
+    CollectTodolistsMeta ..> BasecampScopeConfig : reads PermanentProjectIds
+    ExtractTodosMeta ..> BasecampScopeConfig : reads TodoAgeLimitMonths
+
+    %% ===== PLUGIN TO SUBTASKS =====
+    Basecamp --> CleanupDataMeta : registers
+    Basecamp --> CollectProjectsMeta : registers
+    Basecamp --> ExtractProjectsMeta : registers
+    Basecamp --> CollectTodolistsMeta : registers
+    Basecamp --> ExtractTodolistsMeta : registers
+    Basecamp --> CollectGroupsMeta : registers
+    Basecamp --> ExtractGroupsMeta : registers
+    Basecamp --> CollectTodosMeta : registers
+    Basecamp --> ExtractTodosMeta : registers
+    Basecamp --> CollectCommentsMeta : registers
+    Basecamp --> ExtractCommentsMeta : registers
+    Basecamp --> CollectEventsMeta : registers
+    Basecamp --> ExtractEventsMeta : registers
+    Basecamp --> UpdateTodoCompletionMeta : registers
+    Basecamp --> ConvertProjectsMeta : registers
+    Basecamp --> ConvertTodosMeta : registers
+    Basecamp --> ConvertCommentsMeta : registers
+    Basecamp --> LinkPrToTodoMeta : registers
+
+    %% ===== TASK PIPELINE (dependencies) =====
+    CleanupDataMeta ..> CollectProjectsMeta : then
+    CollectProjectsMeta ..> ExtractProjectsMeta : then
+    ExtractProjectsMeta ..> CollectTodolistsMeta : then
+    CollectTodolistsMeta ..> ExtractTodolistsMeta : then
+    ExtractTodolistsMeta ..> CollectGroupsMeta : then
+    CollectGroupsMeta ..> ExtractGroupsMeta : then
+    ExtractGroupsMeta ..> CollectTodosMeta : then
+    CollectTodosMeta ..> ExtractTodosMeta : then
+    ExtractTodosMeta ..> CollectCommentsMeta : then
+    CollectCommentsMeta ..> ExtractCommentsMeta : then
+    ExtractCommentsMeta ..> CollectEventsMeta : then
+    CollectEventsMeta ..> ExtractEventsMeta : then
+    ExtractEventsMeta ..> UpdateTodoCompletionMeta : then
+    UpdateTodoCompletionMeta ..> ConvertProjectsMeta : then
+    ConvertProjectsMeta ..> ConvertTodosMeta : then
+    ConvertTodosMeta ..> ConvertCommentsMeta : then
+    ConvertCommentsMeta ..> LinkPrToTodoMeta : then
+
+    %% ===== SUBTASK OUTPUTS =====
+    CollectProjectsMeta ..> BasecampApiProject : collects
+    ExtractProjectsMeta ..> BasecampProject : produces
+    CollectTodolistsMeta ..> BasecampApiTodolist : collects
+    ExtractTodolistsMeta ..> BasecampTodolist : produces
+    CollectGroupsMeta ..> BasecampApiGroup : collects
+    ExtractGroupsMeta ..> BasecampTodolistGroup : produces
+    CollectTodosMeta ..> BasecampApiTodo : collects
+    ExtractTodosMeta ..> BasecampTodo : produces
+    CollectCommentsMeta ..> BasecampApiComment : collects
+    ExtractCommentsMeta ..> BasecampTodoComment : produces
+    CollectEventsMeta ..> BasecampApiEvent : collects
+    ExtractEventsMeta ..> BasecampTodoEvent : produces
+    UpdateTodoCompletionMeta ..> BasecampTodo : updates CompletedAt
+    LinkPrToTodoMeta ..> PrReference : produces
+
+    %% ===== ITERATOR USAGE =====
+    CollectTodolistsMeta ..> ProjectInput : iterates per todoset
+    CollectGroupsMeta ..> TodolistForGroupInput : iterates
+    CollectTodosMeta ..> TodolistInput : iterates
+    CollectCommentsMeta ..> TodoInput : iterates
+    CollectEventsMeta ..> TodoInput : iterates

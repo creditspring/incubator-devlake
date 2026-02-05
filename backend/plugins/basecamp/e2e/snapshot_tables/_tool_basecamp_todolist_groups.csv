@@ -1,0 +1,5 @@
+connection_id,group_id,todolist_id,project_id,name,todos_url,_raw_data_params,_raw_data_table,_raw_data_id,_raw_data_remark
+1,7138134749,7138123166,29433274,Group 1,https://3.basecampapi.com/4450519/buckets/29433274/todolists/7138134749/todos.json,"{""ConnectionId"":1,""AccountId"":""4450519""}",_raw_basecamp_todolist_groups,1,
+1,7138130600,7138123166,29433274,Group 2,https://3.basecampapi.com/4450519/buckets/29433274/todolists/7138130600/todos.json,"{""ConnectionId"":1,""AccountId"":""4450519""}",_raw_basecamp_todolist_groups,2,
+1,7138123182,7138123166,29433274,Group 3,https://3.basecampapi.com/4450519/buckets/29433274/todolists/7138123182/todos.json,"{""ConnectionId"":1,""AccountId"":""4450519""}",_raw_basecamp_todolist_groups,3,
+1,7138128994,7138123166,29433274,Group 4,https://3.basecampapi.com/4450519/buckets/29433274/todolists/7138128994/todos.json,"{""ConnectionId"":1,""AccountId"":""4450519""}",_raw_basecamp_todolist_groups,4,

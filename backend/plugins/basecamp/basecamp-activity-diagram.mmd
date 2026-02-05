@@ -1,0 +1,153 @@
+flowchart TD
+    subgraph Init["Initialization"]
+        START([Start Plugin]) --> PREPARE[PrepareTaskData]
+        PREPARE --> |"Creates BasecampTaskData"| TASKDATA[(TaskData)]
+        TASKDATA --> |"Contains"| OPTS[BasecampOptions]
+        TASKDATA --> |"Contains"| CLIENT[ApiAsyncClient]
+        TASKDATA --> |"Contains"| SCOPE[ScopeConfig]
+    end
+
+    subgraph Cleanup["Data Cleanup"]
+        TASKDATA --> CLEAN[CleanupData]
+        CLEAN --> |"Delete existing data"| DEL1[Delete Comments]
+        DEL1 --> DEL2[Delete Events]
+        DEL2 --> DEL3[Delete Todos]
+        DEL3 --> DEL4[Delete Groups]
+        DEL4 --> DEL5[Delete Todolists]
+        DEL5 --> DEL6[Delete Projects]
+        DEL6 --> DEL7[Delete PR References]
+    end
+
+    subgraph Projects["Project Collection & Extraction"]
+        DEL7 --> CP[CollectProjects]
+        CP --> |"GET /projects.json"| API1{Basecamp API}
+        API1 --> |"Raw JSON"| RAW1[(raw: basecamp_projects)]
+        RAW1 --> EP[ExtractProjects]
+        EP --> |"Parse JSON"| PROJ[(BasecampProject)]
+        EP --> |"Extract ALL TodosetIds from Dock"| PROJ
+    end
+
+    subgraph Todolists["Todolist Collection & Extraction"]
+        PROJ --> |"Query projects"| PROJFILTER{Project Age Filter}
+
+        PROJFILTER --> |"Check ScopeConfig"| AGECHECK{ProjectAgeLimitMonths}
+        AGECHECK --> |"0 = no limit"| ALLPROJS[All Projects]
+        AGECHECK --> |"> 0"| CUTOFF[Calculate Cutoff Date]
+
+        CUTOFF --> PERMCHECK{In PermanentProjectIds?}
+        PERMCHECK --> |"Yes"| INCLUDE[Include Project]
+        PERMCHECK --> |"No"| DATECHECK{CreatedAt > Cutoff?}
+        DATECHECK --> |"Yes"| INCLUDE
+        DATECHECK --> |"No"| SKIP1[Skip Old Project]
+
+        ALLPROJS --> ITERATE
+        INCLUDE --> ITERATE
+
+        ITERATE[Iterate ALL TodosetIds per Project] --> |"Split comma-separated"| CTL[CollectTodolists]
+        CTL --> |"For each todosetId"| API2{Basecamp API}
+        API2 --> |"GET /buckets/{project}/todosets/{todoset}/todolists.json"| RAW2[(raw: basecamp_todolists)]
+        RAW2 --> ETL[ExtractTodolists]
+        ETL --> |"Parse JSON"| TDL[(BasecampTodolist)]
+    end
+
+    subgraph Groups["Group Collection & Extraction"]
+        TDL --> |"Iterate TodolistForGroupInput"| CG[CollectGroups]
+        CG --> |"GET /buckets/{project}/todolists/{todolist}/groups.json"| API3{Basecamp API}
+        API3 --> |"Raw JSON"| RAW3[(raw: basecamp_todolist_groups)]
+        RAW3 --> EG[ExtractGroups]
+        EG --> |"Parse JSON"| GRP[(BasecampTodolistGroup)]
+    end
+
+    subgraph Todos["Todo Collection & Extraction"]
+        TDL --> |"Iterate TodolistInput"| CT[CollectTodos]
+        GRP --> |"Iterate TodolistInput"| CT
+        CT --> |"FetchComplete: false"| API4A{Basecamp API}
+        CT --> |"FetchComplete: true"| API4B{Basecamp API}
+        API4A --> |"GET .../todos.json"| RAW4[(raw: basecamp_todos)]
+        API4B --> |"GET .../todos.json?completed=true"| RAW4
+        RAW4 --> ET[ExtractTodos]
+
+        ET --> TODOAGECHECK{TodoAgeLimitMonths > 0?}
+        TODOAGECHECK --> |"Yes"| TODOCUTOFF[Calculate Todo Cutoff]
+        TODOAGECHECK --> |"No"| SAVETODO
+
+        TODOCUTOFF --> UPDATEDCHECK{UpdatedAt > Cutoff?}
+        UPDATEDCHECK --> |"Yes"| SAVETODO[Save Todo]
+        UPDATEDCHECK --> |"No"| SKIPTODO[Skip Old Todo]
+
+        SAVETODO --> TODO[(BasecampTodo)]
+    end
+
+    subgraph Comments["Comment Collection & Extraction"]
+        TODO --> |"Iterate TodoInput"| CC[CollectComments]
+        CC --> |"GET /buckets/{project}/recordings/{todo}/comments.json"| API5{Basecamp API}
+        API5 --> |"Raw JSON"| RAW5[(raw: basecamp_comments)]
+        RAW5 --> EC[ExtractComments]
+        EC --> |"Parse JSON"| COMMENT[(BasecampTodoComment)]
+    end
+
+    subgraph Events["Event Collection & Extraction"]
+        COMMENT --> |"Iterate TodoInput"| CEV[CollectEvents]
+        CEV --> |"GET /buckets/{project}/recordings/{todo}/events.json"| API6{Basecamp API}
+        API6 --> |"Raw JSON"| RAW6[(raw: basecamp_events)]
+        RAW6 --> EEV[ExtractEvents]
+        EEV --> |"Parse JSON"| EVENT[(BasecampTodoEvent)]
+    end
+
+    subgraph CompletionUpdate["Completion Date Update"]
+        EVENT --> UTC[UpdateTodoCompletion]
+        UTC --> |"Find completed event"| FINDCOMP{Action = completed?}
+        FINDCOMP --> |"Yes"| UPDATECOMP[Update Todo.CompletedAt]
+        FINDCOMP --> |"No"| SKIPCOMP[Skip]
+        UPDATECOMP --> TODO2[(BasecampTodo updated)]
+    end
+
+    subgraph Convert["Domain Conversion"]
+        PROJ --> CVTP[ConvertProjects]
+        CVTP --> |"Transform"| BOARD[(ticket.Board)]
+
+        TODO2 --> CVTT[ConvertTodos]
+        CVTT --> |"Transform"| ISSUE[(ticket.Issue)]
+        CVTT --> |"Create Link"| BISSUE[(ticket.BoardIssue)]
+
+        COMMENT --> CVTC[ConvertComments]
+        CVTC --> |"Transform"| ICOMMENT[(ticket.IssueComment)]
+    end
+
+    subgraph PRLink["PR Linking"]
+        ISSUE --> LINK[LinkPrToTodo]
+        LINK --> |"Query"| PRS[(code.PullRequest)]
+        PRS --> |"Extract URLs from title/description"| REGEX{URL Regex}
+        REGEX --> |"All URLs"| PRREF[(PrReference)]
+        REGEX --> |"Match Basecamp URL pattern"| MATCH{Match Todo?}
+        MATCH --> |"Yes"| PRISSUE[(PullRequestIssue)]
+        MATCH --> |"No"| SKIP2[Skip]
+    end
+
+    BOARD --> DONE
+    ICOMMENT --> DONE
+    PRISSUE --> DONE
+    PRREF --> DONE
+    SKIP2 --> DONE
+    SKIP1 --> PROJFILTER
+    SKIPTODO --> ET
+    SKIPCOMP --> UTC
+
+    DONE([End Plugin])
+
+    %% Styling
+    classDef task fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef storage fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef api fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef decision fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef domain fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef config fill:#e0f2f1,stroke:#00695c,stroke-width:2px
+    classDef cleanup fill:#ffebee,stroke:#c62828,stroke-width:2px
+
+    class CP,EP,CTL,ETL,CG,EG,CT,ET,CVTP,CVTT,CVTC,LINK,PREPARE,ITERATE,CC,EC,CEV,EEV,UTC task
+    class RAW1,RAW2,RAW3,RAW4,RAW5,RAW6,PROJ,TDL,GRP,TODO,TODO2,COMMENT,EVENT,TASKDATA,OPTS,CLIENT storage
+    class API1,API2,API3,API4A,API4B,API5,API6 api
+    class PROJFILTER,AGECHECK,PERMCHECK,DATECHECK,TODOAGECHECK,UPDATEDCHECK,REGEX,MATCH,FINDCOMP decision
+    class BOARD,ISSUE,BISSUE,PRREF,PRISSUE,PRS,ICOMMENT domain
+    class SCOPE,CUTOFF,TODOCUTOFF config
+    class CLEAN,DEL1,DEL2,DEL3,DEL4,DEL5,DEL6,DEL7 cleanup

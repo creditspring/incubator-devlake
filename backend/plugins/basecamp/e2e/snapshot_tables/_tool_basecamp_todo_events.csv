@@ -1,0 +1,6 @@
+connection_id,event_id,todo_id,project_id,action,creator_id,creator_name,created_at,details,_raw_data_params,_raw_data_table,_raw_data_id,_raw_data_remark
+1,200001,9506119529,45711354,todo_created,29064901,User 1,2026-01-26T11:05:45Z,{},"{""ConnectionId"":1,""AccountId"":""4450519""}",_raw_basecamp_events,1,
+1,200002,9506119529,45711354,todo_completed,40526968,User 2,2026-01-30T14:22:30Z,"{""completer"":{""id"":40526968,""name"":""User 2""}}","{""ConnectionId"":1,""AccountId"":""4450519""}",_raw_basecamp_events,2,
+1,200003,9506227148,45711354,todo_created,46244529,User 3,2026-01-26T11:40:46Z,{},"{""ConnectionId"":1,""AccountId"":""4450519""}",_raw_basecamp_events,3,
+1,200004,9506227148,45711354,todo_assignment_changed,46244529,User 3,2026-01-27T09:15:00Z,"{""previous_assignees"":[],""current_assignees"":[{""id"":46792841,""name"":""User 4""}]}","{""ConnectionId"":1,""AccountId"":""4450519""}",_raw_basecamp_events,4,
+1,200005,9506227148,45711354,todo_completed,46792841,User 4,2026-01-29T16:45:00Z,"{""completer"":{""id"":46792841,""name"":""User 4""}}","{""ConnectionId"":1,""AccountId"":""4450519""}",_raw_basecamp_events,5,
