@@ -45,6 +45,10 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	return args.Get(0).(*http.Response), args.Error(1)
 }
 
+func timePtr(t time.Time) *time.Time {
+	return &t
+}
+
 func TestNeedsRefresh(t *testing.T) {
 	tp := &TokenProvider{
 		conn: &models.GithubConnection{
@@ -55,15 +59,15 @@ func TestNeedsRefresh(t *testing.T) {
 	}
 
 	// Not expired, outside buffer
-	tp.conn.TokenExpiresAt = time.Now().Add(10 * time.Minute)
+	tp.conn.TokenExpiresAt = timePtr(time.Now().Add(10 * time.Minute))
 	assert.False(t, tp.needsRefresh())
 
 	// Inside buffer
-	tp.conn.TokenExpiresAt = time.Now().Add(1 * time.Minute)
+	tp.conn.TokenExpiresAt = timePtr(time.Now().Add(1 * time.Minute))
 	assert.True(t, tp.needsRefresh())
 
 	// Expired
-	tp.conn.TokenExpiresAt = time.Now().Add(-1 * time.Minute)
+	tp.conn.TokenExpiresAt = timePtr(time.Now().Add(-1 * time.Minute))
 	assert.True(t, tp.needsRefresh())
 
 	// No refresh token
@@ -78,7 +82,7 @@ func TestTokenProviderConcurrency(t *testing.T) {
 	conn := &models.GithubConnection{
 		GithubConn: models.GithubConn{
 			RefreshToken:   "refresh_token",
-			TokenExpiresAt: time.Now().Add(-1 * time.Minute), // Expired
+			TokenExpiresAt: timePtr(time.Now().Add(-1 * time.Minute)), // Expired
 			GithubAppKey: models.GithubAppKey{
 				AppKey: api.AppKey{
 					AppId:     "123",
@@ -129,11 +133,11 @@ func TestConfigurableBuffer(t *testing.T) {
 	}
 
 	// 9 minutes remaining (inside 10m buffer)
-	tp.conn.TokenExpiresAt = time.Now().Add(9 * time.Minute)
+	tp.conn.TokenExpiresAt = timePtr(time.Now().Add(9 * time.Minute))
 	assert.True(t, tp.needsRefresh())
 
 	// 11 minutes remaining (outside 10m buffer)
-	tp.conn.TokenExpiresAt = time.Now().Add(11 * time.Minute)
+	tp.conn.TokenExpiresAt = timePtr(time.Now().Add(11 * time.Minute))
 	assert.False(t, tp.needsRefresh())
 }
 

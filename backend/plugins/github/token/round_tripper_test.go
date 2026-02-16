@@ -32,6 +32,10 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func rtTimePtr(t time.Time) *time.Time {
+	return &t
+}
+
 func TestRoundTripper401Refresh(t *testing.T) {
 	mockRT := new(MockRoundTripper)
 	client := &http.Client{Transport: mockRT}
@@ -44,7 +48,7 @@ func TestRoundTripper401Refresh(t *testing.T) {
 					Token: "old_token",
 				},
 			},
-			TokenExpiresAt: time.Now().Add(10 * time.Minute), // Not expired
+			TokenExpiresAt: rtTimePtr(time.Now().Add(10 * time.Minute)), // Not expired
 			GithubAppKey: models.GithubAppKey{
 				AppKey: api.AppKey{
 					AppId:     "123",
