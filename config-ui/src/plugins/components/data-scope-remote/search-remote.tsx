@@ -102,7 +102,9 @@ export const SearchRemote = ({ mode, plugin, connectionId, config, disabledScope
       message.error(err.response.data.message);
     }
 
-    if (nextPageToken && newItems.length) {
+    // Check if there are more pages based on nextPageToken, not item count
+    // (some APIs like Slack return empty pages but still have more data)
+    if (nextPageToken) {
       setMiller((m) => ({
         ...m,
         items: [...m.items, ...newItems],
@@ -111,6 +113,11 @@ export const SearchRemote = ({ mode, plugin, connectionId, config, disabledScope
           [`${groupId ? groupId : 'root'}`]: nextPageToken,
         },
       }));
+
+      // Auto-load next page if current page returned no items (can't scroll to trigger)
+      if (!newItems.length) {
+        setTimeout(() => getItems(groupId, nextPageToken), 0);
+      }
     } else {
       setMiller((m) => ({
         ...m,
