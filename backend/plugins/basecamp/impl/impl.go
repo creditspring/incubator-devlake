@@ -202,6 +202,9 @@ func (p Basecamp) ApiResources() map[string]map[string]plugin.ApiResourceHandler
 			"GET": api.GetScopeList,
 			"PUT": api.PutScopes,
 		},
+		"connections/:connectionId/remote-scopes": {
+			"GET": api.RemoteScopes,
+		},
 		"scope-config/:scopeConfigId/projects": {
 			"GET": api.GetProjectsByScopeConfig,
 		},

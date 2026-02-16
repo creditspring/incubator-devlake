@@ -19,6 +19,7 @@
 import { IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
+import { AccountId, ClientId, ClientSecret, RefreshToken } from './connection-fields';
 
 export const BasecampConfig: IPluginConfig = {
   plugin: 'basecamp',
@@ -40,33 +41,48 @@ export const BasecampConfig: IPluginConfig = {
           server: '',
         },
       },
-      {
-        key: 'accountId',
-        label: 'Account ID',
-        subLabel:
-          'Your Basecamp account ID. Find it in your Basecamp URL: https://3.basecamp.com/{account_id}/',
-      },
+      ({ initialValues, values, errors, setValues, setErrors }: any) => (
+        <AccountId
+          key="accountId"
+          initialValue={initialValues.accountId ?? ''}
+          value={values.accountId ?? ''}
+          error={errors.accountId ?? ''}
+          setValue={(value) => setValues({ accountId: value })}
+          setError={(error) => setErrors({ accountId: error })}
+        />
+      ),
       {
         key: 'token',
         label: 'Access Token',
         subLabel:
           'OAuth2 access token for Basecamp API. Create an integration at https://launchpad.37signals.com/integrations',
       },
-      {
-        key: 'clientId',
-        label: 'Client ID (Optional)',
-        subLabel: 'OAuth2 Client ID for automatic token refresh.',
-      },
-      {
-        key: 'clientSecret',
-        label: 'Client Secret (Optional)',
-        subLabel: 'OAuth2 Client Secret for automatic token refresh.',
-      },
-      {
-        key: 'refreshToken',
-        label: 'Refresh Token (Optional)',
-        subLabel: 'OAuth2 Refresh Token for automatic token refresh.',
-      },
+      ({ initialValues, values, setValues }: any) => (
+        <ClientId
+          key="clientId"
+          initialValue={initialValues.clientId ?? ''}
+          value={values.clientId ?? ''}
+          setValue={(value) => setValues({ clientId: value })}
+        />
+      ),
+      ({ type, initialValues, values, setValues }: any) => (
+        <ClientSecret
+          key="clientSecret"
+          type={type}
+          initialValue={initialValues.clientSecret ?? ''}
+          value={values.clientSecret ?? ''}
+          setValue={(value) => setValues({ clientSecret: value })}
+        />
+      ),
+      ({ type, initialValues, values, setValues }: any) => (
+        <RefreshToken
+          key="refreshToken"
+          type={type}
+          initialValue={initialValues.refreshToken ?? ''}
+          value={values.refreshToken ?? ''}
+          setValue={(value) => setValues({ refreshToken: value })}
+        />
+      ),
       'proxy',
       {
         key: 'rateLimitPerHour',

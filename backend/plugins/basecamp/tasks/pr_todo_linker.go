@@ -18,6 +18,8 @@ limitations under the License.
 package tasks
 
 import (
+	"fmt"
+	"hash/fnv"
 	"regexp"
 
 	"github.com/apache/incubator-devlake/core/dal"
@@ -49,6 +51,14 @@ var basecampTodoRegex = regexp.MustCompile(`https?://3\.basecamp\.com/\d+/bucket
 
 // urlRegex matches any http/https URL
 var urlRegex = regexp.MustCompile(`https?://[^\s<>\[\]()'"]+`)
+
+// generatePrReferenceId creates a deterministic ID from the composite key fields
+// This ensures BatchSave properly deduplicates records
+func generatePrReferenceId(connectionId uint64, pullRequestId string, url string) uint64 {
+	h := fnv.New64a()
+	h.Write([]byte(fmt.Sprintf("%d:%s:%s", connectionId, pullRequestId, url)))
+	return h.Sum64()
+}
 
 func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
@@ -103,6 +113,7 @@ func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
 					if !seenUrls[url] {
 						seenUrls[url] = true
 						results = append(results, &models.PrReference{
+							Id:            generatePrReferenceId(data.Options.ConnectionId, pr.Id, url),
 							ConnectionId:  data.Options.ConnectionId,
 							PullRequestId: pr.Id,
 							Url:           url,
