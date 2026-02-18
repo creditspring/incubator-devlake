@@ -24,27 +24,27 @@ import (
 
 type SlackChannel struct {
 	common.Scope       `mapstructure:",squash"`
-	Id                 string `json:"id" gorm:"primaryKey"`
-	Name               string `json:"name"`
-	IsChannel          bool   `json:"is_channel"`
-	IsGroup            bool   `json:"is_group"`
-	IsIm               bool   `json:"is_im"`
-	IsMpim             bool   `json:"is_mpim"`
-	IsPrivate          bool   `json:"is_private"`
-	Created            int    `json:"created"`
-	IsArchived         bool   `json:"is_archived"`
-	IsGeneral          bool   `json:"is_general"`
-	Unlinked           int    `json:"unlinked"`
-	NameNormalized     string `json:"name_normalized"`
-	IsShared           bool   `json:"is_shared"`
-	IsOrgShared        bool   `json:"is_org_shared"`
-	IsPendingExtShared bool   `json:"is_pending_ext_shared"`
-	ContextTeamId      string `json:"context_team_id"`
-	Updated            int64  `json:"updated"`
-	Creator            string `json:"creator"`
-	IsExtShared        bool   `json:"is_ext_shared"`
-	IsMember           bool   `json:"is_member"`
-	NumMembers         int    `json:"num_members"`
+	Id                 string `json:"id" gorm:"primaryKey" mapstructure:"id"`
+	Name               string `json:"name" mapstructure:"name"`
+	IsChannel          bool   `json:"is_channel" mapstructure:"is_channel"`
+	IsGroup            bool   `json:"is_group" mapstructure:"is_group"`
+	IsIm               bool   `json:"is_im" mapstructure:"is_im"`
+	IsMpim             bool   `json:"is_mpim" mapstructure:"is_mpim"`
+	IsPrivate          bool   `json:"is_private" mapstructure:"is_private"`
+	Created            int    `json:"created" mapstructure:"created"`
+	IsArchived         bool   `json:"is_archived" mapstructure:"is_archived"`
+	IsGeneral          bool   `json:"is_general" mapstructure:"is_general"`
+	Unlinked           int    `json:"unlinked" mapstructure:"unlinked"`
+	NameNormalized     string `json:"name_normalized" mapstructure:"name_normalized"`
+	IsShared           bool   `json:"is_shared" mapstructure:"is_shared"`
+	IsOrgShared        bool   `json:"is_org_shared" mapstructure:"is_org_shared"`
+	IsPendingExtShared bool   `json:"is_pending_ext_shared" mapstructure:"is_pending_ext_shared"`
+	ContextTeamId      string `json:"context_team_id" mapstructure:"context_team_id"`
+	Updated            int64  `json:"updated" mapstructure:"updated"`
+	Creator            string `json:"creator" mapstructure:"creator"`
+	IsExtShared        bool   `json:"is_ext_shared" mapstructure:"is_ext_shared"`
+	IsMember           bool   `json:"is_member" mapstructure:"is_member"`
+	NumMembers         int    `json:"num_members" mapstructure:"num_members"`
 }
 
 func (SlackChannel) TableName() string {
