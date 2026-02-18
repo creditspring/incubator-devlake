@@ -470,23 +470,51 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 3
+                "color": "green"
               },
               {
                 "color": "red",
-                "value": 5
+                "value": 80
               }
             ]
           }
@@ -501,28 +529,29 @@
       },
       "id": 6,
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": true
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "textMode": "value_and_name"
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n  SUM(CASE WHEN tl.name = 'All bugs' THEN 1 ELSE 0 END) as Triage,\n  SUM(CASE WHEN tl.name = 'High Priority' THEN 1 ELSE 0 END) as High,\n  SUM(CASE WHEN tl.name = 'Medium Priority' THEN 1 ELSE 0 END) as Medium,\n  SUM(CASE WHEN tl.name = 'Low Priority' THEN 1 ELSE 0 END) as Low\nFROM _tool_basecamp_todos t\nJOIN _tool_basecamp_todolists tl ON t.todo_list_id = tl.todolist_id\nWHERE t.project_id = '16186768'\n  AND t.completed = 0",
+          "rawSql": "WITH weeks AS (\n  SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as week_start\n  FROM _tool_basecamp_todos WHERE project_id = '16186768'\n  UNION\n  SELECT DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY))\n  FROM _tool_basecamp_todos WHERE project_id = '16186768' AND completed_at IS NOT NULL\n)\nSELECT\n  w.week_start as time,\n  SUM(CASE WHEN tl.name = 'All bugs' THEN 1 ELSE 0 END) as Triage,\n  SUM(CASE WHEN tl.name = 'High Priority' THEN 1 ELSE 0 END) as High,\n  SUM(CASE WHEN tl.name = 'Medium Priority' THEN 1 ELSE 0 END) as Medium,\n  SUM(CASE WHEN tl.name = 'Low Priority' THEN 1 ELSE 0 END) as Low\nFROM weeks w\nJOIN _tool_basecamp_todos t ON t.project_id = '16186768'\n  AND t.created_at <= DATE_ADD(w.week_start, INTERVAL 6 DAY)\n  AND (t.completed_at IS NULL OR t.completed_at > DATE_ADD(w.week_start, INTERVAL 6 DAY))\nJOIN _tool_basecamp_todolists tl ON t.todo_list_id = tl.todolist_id\nGROUP BY w.week_start\nORDER BY w.week_start",
           "refId": "A"
         }
       ],
       "title": "Open Fixes by Priority",
-      "type": "stat"
+      "type": "timeseries"
     },
     {
       "datasource": "mysql",
@@ -794,23 +823,51 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 20
+                "color": "green"
               },
               {
                 "color": "red",
-                "value": 40
+                "value": 80
               }
             ]
           }
@@ -825,28 +882,29 @@
       },
       "id": 10,
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": true
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "textMode": "value_and_name"
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH todoset_mapping AS (\n  SELECT DISTINCT\n    SUBSTRING_INDEX(SUBSTRING_INDEX(r.input, 'TodosetId\": \"', -1), '\"', 1) as todoset_id,\n    TRIM(SUBSTRING(r.data, 7, LOCATE(',', r.data) - 7)) as todolist_id\n  FROM _raw_basecamp_todolists r\n  WHERE r.input LIKE '%29433274%'\n),\ntodoset_groups AS (\n  SELECT m.todoset_id, g.group_id as todolist_id\n  FROM todoset_mapping m\n  JOIN _tool_basecamp_todolist_groups g ON m.todolist_id = g.todolist_id\n  WHERE g.project_id = '29433274'\n  UNION\n  SELECT todoset_id, todolist_id FROM todoset_mapping\n)\nSELECT\n  SUM(CASE WHEN tg.todoset_id = '7138095528' THEN 1 ELSE 0 END) as Engineering,\n  SUM(CASE WHEN tg.todoset_id = '8062742858' THEN 1 ELSE 0 END) as Prioritised,\n  SUM(CASE WHEN tg.todoset_id = '5355919599' THEN 1 ELSE 0 END) as Requests\nFROM todoset_groups tg\nJOIN _tool_basecamp_todos t ON t.todo_list_id = tg.todolist_id\nWHERE t.project_id = '29433274' AND t.completed = 0",
+          "rawSql": "WITH todoset_mapping AS (\n  SELECT DISTINCT\n    SUBSTRING_INDEX(SUBSTRING_INDEX(r.input, 'TodosetId\": \"', -1), '\"', 1) as todoset_id,\n    TRIM(SUBSTRING(r.data, 7, LOCATE(',', r.data) - 7)) as todolist_id\n  FROM _raw_basecamp_todolists r\n  WHERE r.input LIKE '%29433274%'\n),\ntodoset_groups AS (\n  SELECT m.todoset_id, g.group_id as todolist_id\n  FROM todoset_mapping m\n  JOIN _tool_basecamp_todolist_groups g ON m.todolist_id = g.todolist_id\n  WHERE g.project_id = '29433274'\n  UNION\n  SELECT todoset_id, todolist_id FROM todoset_mapping\n),\nweeks AS (\n  SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as week_start\n  FROM _tool_basecamp_todos WHERE project_id = '29433274'\n  UNION\n  SELECT DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY))\n  FROM _tool_basecamp_todos WHERE project_id = '29433274' AND completed_at IS NOT NULL\n)\nSELECT\n  w.week_start as time,\n  SUM(CASE WHEN tg.todoset_id = '7138095528' THEN 1 ELSE 0 END) as Engineering,\n  SUM(CASE WHEN tg.todoset_id = '8062742858' THEN 1 ELSE 0 END) as Prioritised,\n  SUM(CASE WHEN tg.todoset_id = '5355919599' THEN 1 ELSE 0 END) as Requests\nFROM weeks w\nCROSS JOIN todoset_groups tg\nJOIN _tool_basecamp_todos t ON t.todo_list_id = tg.todolist_id\n  AND t.project_id = '29433274'\n  AND t.created_at <= DATE_ADD(w.week_start, INTERVAL 6 DAY)\n  AND (t.completed_at IS NULL OR t.completed_at > DATE_ADD(w.week_start, INTERVAL 6 DAY))\nGROUP BY w.week_start\nORDER BY w.week_start",
           "refId": "A"
         }
       ],
       "title": "Open BAU by Todoset",
-      "type": "stat"
+      "type": "timeseries"
     },
     {
       "datasource": "mysql",
