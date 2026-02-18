@@ -11,7 +11,8 @@
       "Bash(docker ps:*)",
       "Bash(find:*)",
       "WebFetch(domain:github.com)",
-      "Bash(./devops/releases/latest/refresh_token.sh:*)"
+      "Bash(./devops/releases/latest/refresh_token.sh:*)",
+      "Bash(/opt/homebrew/opt/mysql-client/bin/mysql:*)"
     ]
   }
 }
