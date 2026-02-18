@@ -20,10 +20,13 @@ package tasks
 import (
 	"fmt"
 	"hash/fnv"
+	"net/http"
 	"regexp"
+	"strconv"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
+	coreLog "github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/code"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
@@ -47,7 +50,8 @@ var LinkPrToTodoMeta = plugin.SubTaskMeta{
 
 // basecampTodoRegex matches Basecamp todo URLs
 // Format: https://3.basecamp.com/{account}/buckets/{bucket_id}/todos/{todo_id}
-var basecampTodoRegex = regexp.MustCompile(`https?://3\.basecamp\.com/\d+/buckets/(\d+)/todos/(\d+)`)
+// Captures: [1]=account_id, [2]=bucket_id, [3]=todo_id
+var basecampTodoRegex = regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/buckets/(\d+)/todos/(\d+)`)
 
 // urlRegex matches any http/https URL
 var urlRegex = regexp.MustCompile(`https?://[^\s<>\[\]()'"]+`)
@@ -58,6 +62,42 @@ func generatePrReferenceId(connectionId uint64, pullRequestId string, url string
 	h := fnv.New64a()
 	h.Write([]byte(fmt.Sprintf("%d:%s:%s", connectionId, pullRequestId, url)))
 	return h.Sum64()
+}
+
+// resolveTodoId resolves a possibly-moved todo by calling the Basecamp API.
+// If the todo was moved, the API redirects and returns JSON with the current ID.
+// Results are cached in resolvedIds to avoid redundant API calls.
+func resolveTodoId(
+	apiClient *api.ApiClient,
+	logger coreLog.Logger,
+	resolvedIds map[string]string,
+	accountId, bucketId, todoId string,
+) string {
+	if resolved, ok := resolvedIds[todoId]; ok {
+		return resolved
+	}
+	path := fmt.Sprintf("%s/buckets/%s/todos/%s.json", accountId, bucketId, todoId)
+	resp, err := apiClient.Get(path, nil, nil)
+	if err != nil {
+		logger.Warn(err, "failed to resolve todo %s via API", todoId)
+		resolvedIds[todoId] = ""
+		return ""
+	}
+	if resp.StatusCode != http.StatusOK {
+		logger.Warn(nil, "API returned %d resolving todo %s", resp.StatusCode, todoId)
+		resp.Body.Close()
+		resolvedIds[todoId] = ""
+		return ""
+	}
+	var apiTodo BasecampApiTodo
+	if unmarshalErr := api.UnmarshalResponse(resp, &apiTodo); unmarshalErr != nil {
+		logger.Warn(unmarshalErr, "failed to unmarshal API response for todo %s", todoId)
+		resolvedIds[todoId] = ""
+		return ""
+	}
+	resolved := strconv.FormatInt(apiTodo.ID, 10)
+	resolvedIds[todoId] = resolved
+	return resolved
 }
 
 func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
@@ -93,6 +133,9 @@ func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
 		todoIdMap[todo.TodoId] = domainId
 	}
 
+	// Cache for API-resolved todo IDs (for moved todos)
+	resolvedIds := make(map[string]string)
+
 	logger.Info("Processing PRs: extracting URLs and linking to %d todos", len(todoIdMap))
 
 	enricher, err := api.NewDataEnricher(api.DataEnricherArgs[code.PullRequest]{
@@ -121,15 +164,26 @@ func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
 					}
 				}
 
-				// Create pull_request_issues links for Basecamp todos (existing logic)
+				// Create pull_request_issues links for Basecamp todos
 				basecampMatches := basecampTodoRegex.FindAllStringSubmatch(text, -1)
 				for _, match := range basecampMatches {
-					if len(match) == 3 {
-						// match[1] is bucket_id, match[2] is todo_id
-						todoId := match[2]
+					if len(match) == 4 {
+						// match[1] is account_id, match[2] is bucket_id, match[3] is todo_id
+						accountId := match[1]
+						bucketId := match[2]
+						todoId := match[3]
+
+						effectiveTodoId := todoId
+						if _, exists := todoIdMap[todoId]; !exists {
+							// Todo not found — it may have been moved. Resolve via API.
+							effectiveTodoId = resolveTodoId(data.ApiClient.ApiClient, logger, resolvedIds, accountId, bucketId, todoId)
+							if effectiveTodoId == "" {
+								continue
+							}
+						}
 
 						// Check if this todo exists in our database
-						if domainId, exists := todoIdMap[todoId]; exists {
+						if domainId, exists := todoIdMap[effectiveTodoId]; exists {
 							// Check if link already exists to avoid duplicates
 							var existing crossdomain.PullRequestIssue
 							err := db.First(&existing,
@@ -141,7 +195,7 @@ func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
 									PullRequestId:  pr.Id,
 									IssueId:        domainId,
 									PullRequestKey: pr.PullRequestKey,
-									IssueKey:       todoId,
+									IssueKey:       effectiveTodoId,
 								})
 							}
 						}
