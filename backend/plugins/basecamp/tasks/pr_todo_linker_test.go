@@ -49,26 +49,29 @@ func newTestApiClient(server *httptest.Server) *api.ApiClient {
 	return client
 }
 
-func TestResolveTodoId_Success(t *testing.T) {
+func TestResolveTodo_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/12345/buckets/100/todos/999.json", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"id": 42, "title": "resolved todo"}`)
+		fmt.Fprint(w, `{"id": 42, "title": "resolved todo", "bucket": {"id": 100, "name": "Test Project"}}`)
 	}))
 	defer server.Close()
 
 	client := newTestApiClient(server)
 	logger := &nopLogger{}
-	cache := make(map[string]string)
+	cache := make(map[string]*BasecampApiTodo)
 
-	result := resolveTodoId(client, logger, cache, "12345", "100", "999")
+	result := resolveTodo(client, logger, cache, "12345", "100", "999")
 
-	assert.Equal(t, "42", result)
-	assert.Equal(t, "42", cache["999"])
+	assert.NotNil(t, result)
+	assert.Equal(t, int64(42), result.ID)
+	assert.Equal(t, "resolved todo", result.Title)
+	assert.NotNil(t, cache["999"])
+	assert.Equal(t, int64(42), cache["999"].ID)
 }
 
-func TestResolveTodoId_NotFound(t *testing.T) {
+func TestResolveTodo_NotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -76,18 +79,18 @@ func TestResolveTodoId_NotFound(t *testing.T) {
 
 	client := newTestApiClient(server)
 	logger := &nopLogger{}
-	cache := make(map[string]string)
+	cache := make(map[string]*BasecampApiTodo)
 
-	result := resolveTodoId(client, logger, cache, "12345", "100", "999")
+	result := resolveTodo(client, logger, cache, "12345", "100", "999")
 
-	assert.Equal(t, "", result)
+	assert.Nil(t, result)
 	// Failure is cached so subsequent calls don't hit the API
 	cached, ok := cache["999"]
 	assert.True(t, ok)
-	assert.Equal(t, "", cached)
+	assert.Nil(t, cached)
 }
 
-func TestResolveTodoId_CacheHit(t *testing.T) {
+func TestResolveTodo_CacheHit(t *testing.T) {
 	serverCalled := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		serverCalled = true
@@ -98,15 +101,16 @@ func TestResolveTodoId_CacheHit(t *testing.T) {
 
 	client := newTestApiClient(server)
 	logger := &nopLogger{}
-	cache := map[string]string{"999": "42"}
+	cache := map[string]*BasecampApiTodo{"999": {ID: 42, Title: "cached todo"}}
 
-	result := resolveTodoId(client, logger, cache, "12345", "100", "999")
+	result := resolveTodo(client, logger, cache, "12345", "100", "999")
 
-	assert.Equal(t, "42", result)
+	assert.NotNil(t, result)
+	assert.Equal(t, int64(42), result.ID)
 	assert.False(t, serverCalled, "API should not be called when cache already has the result")
 }
 
-func TestResolveTodoId_CacheHitEmpty(t *testing.T) {
+func TestResolveTodo_CacheHitNil(t *testing.T) {
 	serverCalled := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		serverCalled = true
@@ -115,16 +119,16 @@ func TestResolveTodoId_CacheHitEmpty(t *testing.T) {
 
 	client := newTestApiClient(server)
 	logger := &nopLogger{}
-	// Empty string means a previous lookup failed — should not retry
-	cache := map[string]string{"999": ""}
+	// nil value means a previous lookup failed — should not retry
+	cache := map[string]*BasecampApiTodo{"999": nil}
 
-	result := resolveTodoId(client, logger, cache, "12345", "100", "999")
+	result := resolveTodo(client, logger, cache, "12345", "100", "999")
 
-	assert.Equal(t, "", result)
+	assert.Nil(t, result)
 	assert.False(t, serverCalled, "API should not be called when a failed lookup is cached")
 }
 
-func TestResolveTodoId_InvalidJson(t *testing.T) {
+func TestResolveTodo_InvalidJson(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -134,15 +138,17 @@ func TestResolveTodoId_InvalidJson(t *testing.T) {
 
 	client := newTestApiClient(server)
 	logger := &nopLogger{}
-	cache := make(map[string]string)
+	cache := make(map[string]*BasecampApiTodo)
 
-	result := resolveTodoId(client, logger, cache, "12345", "100", "999")
+	result := resolveTodo(client, logger, cache, "12345", "100", "999")
 
-	assert.Equal(t, "", result)
-	assert.Equal(t, "", cache["999"])
+	assert.Nil(t, result)
+	cached, ok := cache["999"]
+	assert.True(t, ok)
+	assert.Nil(t, cached)
 }
 
-func TestResolveTodoId_Redirect(t *testing.T) {
+func TestResolveTodo_Redirect(t *testing.T) {
 	// Simulates the moved-todo scenario: the server redirects to a new location
 	// and returns the new todo's JSON. Go's http.Client follows redirects by default.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -152,18 +158,21 @@ func TestResolveTodoId_Redirect(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"id": 9536886492, "title": "moved todo"}`)
+		fmt.Fprint(w, `{"id": 9536886492, "title": "moved todo", "bucket": {"id": 200, "name": "New Project"}}`)
 	}))
 	defer server.Close()
 
 	client := newTestApiClient(server)
 	logger := &nopLogger{}
-	cache := make(map[string]string)
+	cache := make(map[string]*BasecampApiTodo)
 
-	result := resolveTodoId(client, logger, cache, "12345", "100", "OLD")
+	result := resolveTodo(client, logger, cache, "12345", "100", "OLD")
 
-	assert.Equal(t, "9536886492", result)
-	assert.Equal(t, "9536886492", cache["OLD"])
+	assert.NotNil(t, result)
+	assert.Equal(t, int64(9536886492), result.ID)
+	assert.Equal(t, "moved todo", result.Title)
+	assert.NotNil(t, cache["OLD"])
+	assert.Equal(t, int64(9536886492), cache["OLD"].ID)
 }
 
 func TestBasecampTodoRegex_CaptureGroups(t *testing.T) {
@@ -243,4 +252,21 @@ func TestGeneratePrReferenceId_DifferentInputs(t *testing.T) {
 	id3 := generatePrReferenceId(1, "pr-123", "https://example.com")
 	id4 := generatePrReferenceId(2, "pr-123", "https://example.com")
 	assert.NotEqual(t, id3, id4, "different connection IDs should produce different IDs")
+}
+
+func TestParseTime_Valid(t *testing.T) {
+	result := parseTime("2024-01-15T10:30:00Z")
+	assert.NotNil(t, result)
+	assert.Equal(t, 2024, result.Year())
+	assert.Equal(t, 15, result.Day())
+}
+
+func TestParseTime_Empty(t *testing.T) {
+	result := parseTime("")
+	assert.Nil(t, result)
+}
+
+func TestParseTime_Invalid(t *testing.T) {
+	result := parseTime("not a date")
+	assert.Nil(t, result)
 }
