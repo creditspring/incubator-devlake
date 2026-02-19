@@ -392,12 +392,190 @@
       "type": "timeseries"
     },
     {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 7
+      },
+      "id": 22,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH weekly AS (\n  SELECT\n    DATE(DATE_SUB(merged_date, INTERVAL WEEKDAY(merged_date) DAY)) as time,\n    additions,\n    deletions,\n    ROW_NUMBER() OVER (PARTITION BY DATE(DATE_SUB(merged_date, INTERVAL WEEKDAY(merged_date) DAY)) ORDER BY additions) as rn_add,\n    ROW_NUMBER() OVER (PARTITION BY DATE(DATE_SUB(merged_date, INTERVAL WEEKDAY(merged_date) DAY)) ORDER BY deletions) as rn_del,\n    COUNT(*) OVER (PARTITION BY DATE(DATE_SUB(merged_date, INTERVAL WEEKDAY(merged_date) DAY))) as cnt\n  FROM pull_requests\n  WHERE merged_date IS NOT NULL\n)\nSELECT\n  time,\n  AVG(CASE WHEN rn_add IN (FLOOR((cnt+1)/2), CEIL((cnt+1)/2)) THEN additions END) as median_additions,\n  AVG(CASE WHEN rn_del IN (FLOOR((cnt+1)/2), CEIL((cnt+1)/2)) THEN deletions END) as median_deletions\nFROM weekly\nGROUP BY time\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Median PR Lines Changed",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 7
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH weekly AS (\n  SELECT\n    DATE(DATE_SUB(pr.merged_date, INTERVAL WEEKDAY(pr.merged_date) DAY)) as time,\n    COUNT(DISTINCT pr.id) as high_risk_prs\n  FROM pull_requests pr\n  JOIN pull_request_labels prl ON pr.id = prl.pull_request_id\n  WHERE pr.merged_date IS NOT NULL\n    AND prl.label_name = 'high risk'\n  GROUP BY time\n)\nSELECT\n  time,\n  high_risk_prs,\n  AVG(high_risk_prs) OVER (ORDER BY time ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) as moving_avg_12w\nFROM weekly\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Weekly High Risk PRs",
+      "type": "timeseries"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 13
       },
       "id": 19,
       "panels": [],
@@ -464,7 +642,7 @@
         "h": 6,
         "w": 6,
         "x": 0,
-        "y": 8
+        "y": 14
       },
       "id": 5,
       "options": {
@@ -554,7 +732,7 @@
         "h": 6,
         "w": 6,
         "x": 6,
-        "y": 8
+        "y": 14
       },
       "id": 8,
       "options": {
@@ -643,7 +821,7 @@
         "h": 6,
         "w": 6,
         "x": 12,
-        "y": 8
+        "y": 14
       },
       "id": 7,
       "options": {
@@ -732,7 +910,7 @@
         "h": 6,
         "w": 6,
         "x": 18,
-        "y": 8
+        "y": 14
       },
       "id": 17,
       "options": {
@@ -762,19 +940,6 @@
       "type": "timeseries"
     },
     {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 15
-      },
-      "id": 20,
-      "panels": [],
-      "title": "Tasks Management",
-      "type": "row"
-    },
-    {
       "datasource": "mysql",
       "fieldConfig": {
         "defaults": {
@@ -834,376 +999,7 @@
         "h": 6,
         "w": 6,
         "x": 0,
-        "y": 16
-      },
-      "id": 10,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH todoset_mapping AS (\n  SELECT DISTINCT\n    SUBSTRING_INDEX(SUBSTRING_INDEX(r.input, 'TodosetId\": \"', -1), '\"', 1) as todoset_id,\n    TRIM(SUBSTRING(r.data, 7, LOCATE(',', r.data) - 7)) as todolist_id\n  FROM _raw_basecamp_todolists r\n  WHERE r.input LIKE '%29433274%'\n),\ntodoset_groups AS (\n  SELECT m.todoset_id, g.group_id as todolist_id\n  FROM todoset_mapping m\n  JOIN _tool_basecamp_todolist_groups g ON m.todolist_id = g.todolist_id\n  WHERE g.project_id = '29433274'\n  UNION\n  SELECT todoset_id, todolist_id FROM todoset_mapping\n),\nweeks AS (\n  SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as week_start\n  FROM _tool_basecamp_todos WHERE project_id = '29433274'\n  UNION\n  SELECT DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY))\n  FROM _tool_basecamp_todos WHERE project_id = '29433274' AND completed_at IS NOT NULL\n)\nSELECT\n  w.week_start as time,\n  SUM(CASE WHEN tg.todoset_id = '7138095528' THEN 1 ELSE 0 END) as Engineering,\n  SUM(CASE WHEN tg.todoset_id = '8062742858' THEN 1 ELSE 0 END) as Prioritised,\n  SUM(CASE WHEN tg.todoset_id = '5355919599' THEN 1 ELSE 0 END) as Requests\nFROM weeks w\nCROSS JOIN todoset_groups tg\nJOIN _tool_basecamp_todos t ON t.todo_list_id = tg.todolist_id\n  AND t.project_id = '29433274'\n  AND t.created_at <= DATE_ADD(w.week_start, INTERVAL 6 DAY)\n  AND (t.completed_at IS NULL OR t.completed_at > DATE_ADD(w.week_start, INTERVAL 6 DAY))\nGROUP BY w.week_start\nORDER BY w.week_start",
-          "refId": "A"
-        }
-      ],
-      "title": "Open BAU by Todoset",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "mysql",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 6,
-        "y": 16
-      },
-      "id": 6,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH weeks AS (\n  SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as week_start\n  FROM _tool_basecamp_todos WHERE project_id = '16186768'\n  UNION\n  SELECT DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY))\n  FROM _tool_basecamp_todos WHERE project_id = '16186768' AND completed_at IS NOT NULL\n)\nSELECT\n  w.week_start as time,\n  SUM(CASE WHEN tl.name = 'All bugs' THEN 1 ELSE 0 END) as Triage,\n  SUM(CASE WHEN tl.name = 'High Priority' THEN 1 ELSE 0 END) as High,\n  SUM(CASE WHEN tl.name = 'Medium Priority' THEN 1 ELSE 0 END) as Medium,\n  SUM(CASE WHEN tl.name = 'Low Priority' THEN 1 ELSE 0 END) as Low\nFROM weeks w\nJOIN _tool_basecamp_todos t ON t.project_id = '16186768'\n  AND t.created_at <= DATE_ADD(w.week_start, INTERVAL 6 DAY)\n  AND (t.completed_at IS NULL OR t.completed_at > DATE_ADD(w.week_start, INTERVAL 6 DAY))\nJOIN _tool_basecamp_todolists tl ON t.todo_list_id = tl.todolist_id\nGROUP BY w.week_start\nORDER BY w.week_start",
-          "refId": "A"
-        }
-      ],
-      "title": "Open Fixes by Priority",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "mysql",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 12,
-        "y": 16
-      },
-      "id": 9,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH weekly_reported AS (\n  SELECT\n    DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as time,\n    COUNT(*) as bau_reported\n  FROM _tool_basecamp_todos\n  WHERE project_id = '29433274'\n  GROUP BY time\n),\nweekly_solved AS (\n  SELECT\n    DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY)) as time,\n    COUNT(*) as bau_solved\n  FROM _tool_basecamp_todos\n  WHERE project_id = '29433274'\n    AND completed = 1\n    AND completed_at IS NOT NULL\n  GROUP BY time\n),\ncombined AS (\n  SELECT COALESCE(r.time, s.time) as time,\n    COALESCE(r.bau_reported, 0) as bau_reported,\n    COALESCE(s.bau_solved, 0) as bau_solved\n  FROM weekly_reported r\n  LEFT JOIN weekly_solved s ON r.time = s.time\n  UNION\n  SELECT s.time, 0, s.bau_solved\n  FROM weekly_solved s\n  LEFT JOIN weekly_reported r ON r.time = s.time\n  WHERE r.time IS NULL\n)\nSELECT\n  time,\n  bau_reported,\n  bau_solved\nFROM combined\nORDER BY time",
-          "refId": "A"
-        }
-      ],
-      "title": "BAU Tasks (Weekly)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "mysql",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 18,
-        "y": 16
-      },
-      "id": 13,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH weekly AS (\n  SELECT\n    DATE(DATE_SUB(pr.merged_date, INTERVAL WEEKDAY(pr.merged_date) DAY)) as time,\n    COUNT(DISTINCT pr.id) as high_risk_prs\n  FROM pull_requests pr\n  JOIN pull_request_labels prl ON pr.id = prl.pull_request_id\n  WHERE pr.merged_date IS NOT NULL\n    AND prl.label_name = 'high risk'\n  GROUP BY time\n)\nSELECT\n  time,\n  high_risk_prs,\n  AVG(high_risk_prs) OVER (ORDER BY time ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) as moving_avg_12w\nFROM weekly\nORDER BY time",
-          "refId": "A"
-        }
-      ],
-      "title": "Weekly High Risk PRs",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 23
-      },
-      "id": 21,
-      "panels": [],
-      "title": "Support",
-      "type": "row"
-    },
-    {
-      "datasource": "mysql",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 0,
-        "y": 24
+        "y": 20
       },
       "id": 15,
       "options": {
@@ -1292,7 +1088,7 @@
         "h": 6,
         "w": 6,
         "x": 6,
-        "y": 24
+        "y": 20
       },
       "id": 14,
       "options": {
@@ -1319,6 +1115,197 @@
         }
       ],
       "title": "Weekly Messages (3rd-party-alerts)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "id": 20,
+      "panels": [],
+      "title": "Tasks Management",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 27
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH todoset_mapping AS (\n  SELECT DISTINCT\n    SUBSTRING_INDEX(SUBSTRING_INDEX(r.input, 'TodosetId\": \"', -1), '\"', 1) as todoset_id,\n    TRIM(SUBSTRING(r.data, 7, LOCATE(',', r.data) - 7)) as todolist_id\n  FROM _raw_basecamp_todolists r\n  WHERE r.input LIKE '%29433274%'\n),\ntodoset_groups AS (\n  SELECT m.todoset_id, g.group_id as todolist_id\n  FROM todoset_mapping m\n  JOIN _tool_basecamp_todolist_groups g ON m.todolist_id = g.todolist_id\n  WHERE g.project_id = '29433274'\n  UNION\n  SELECT todoset_id, todolist_id FROM todoset_mapping\n),\nweeks AS (\n  SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as week_start\n  FROM _tool_basecamp_todos WHERE project_id = '29433274'\n  UNION\n  SELECT DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY))\n  FROM _tool_basecamp_todos WHERE project_id = '29433274' AND completed_at IS NOT NULL\n)\nSELECT\n  w.week_start as time,\n  SUM(CASE WHEN tg.todoset_id = '7138095528' THEN 1 ELSE 0 END) as Engineering,\n  SUM(CASE WHEN tg.todoset_id = '8062742858' THEN 1 ELSE 0 END) as Prioritised,\n  SUM(CASE WHEN tg.todoset_id = '5355919599' THEN 1 ELSE 0 END) as Requests\nFROM weeks w\nCROSS JOIN todoset_groups tg\nJOIN _tool_basecamp_todos t ON t.todo_list_id = tg.todolist_id\n  AND t.project_id = '29433274'\n  AND t.created_at <= DATE_ADD(w.week_start, INTERVAL 6 DAY)\n  AND (t.completed_at IS NULL OR t.completed_at > DATE_ADD(w.week_start, INTERVAL 6 DAY))\nGROUP BY w.week_start\nORDER BY w.week_start",
+          "refId": "A"
+        }
+      ],
+      "title": "Open BAU by Todoset",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 27
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH weeks AS (\n  SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as week_start\n  FROM _tool_basecamp_todos WHERE project_id = '16186768'\n  UNION\n  SELECT DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY))\n  FROM _tool_basecamp_todos WHERE project_id = '16186768' AND completed_at IS NOT NULL\n)\nSELECT\n  w.week_start as time,\n  SUM(CASE WHEN tl.name = 'All bugs' THEN 1 ELSE 0 END) as Triage,\n  SUM(CASE WHEN tl.name = 'High Priority' THEN 1 ELSE 0 END) as High,\n  SUM(CASE WHEN tl.name = 'Medium Priority' THEN 1 ELSE 0 END) as Medium,\n  SUM(CASE WHEN tl.name = 'Low Priority' THEN 1 ELSE 0 END) as Low\nFROM weeks w\nJOIN _tool_basecamp_todos t ON t.project_id = '16186768'\n  AND t.created_at <= DATE_ADD(w.week_start, INTERVAL 6 DAY)\n  AND (t.completed_at IS NULL OR t.completed_at > DATE_ADD(w.week_start, INTERVAL 6 DAY))\nJOIN _tool_basecamp_todolists tl ON t.todo_list_id = tl.todolist_id\nGROUP BY w.week_start\nORDER BY w.week_start",
+          "refId": "A"
+        }
+      ],
+      "title": "Open Fixes by Priority",
       "type": "timeseries"
     },
     {
@@ -1381,7 +1368,109 @@
         "h": 6,
         "w": 6,
         "x": 12,
-        "y": 24
+        "y": 27
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH weekly_reported AS (\n  SELECT\n    DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as time,\n    COUNT(*) as bau_reported\n  FROM _tool_basecamp_todos\n  WHERE project_id = '29433274'\n  GROUP BY time\n),\nweekly_solved AS (\n  SELECT\n    DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY)) as time,\n    COUNT(*) as bau_solved\n  FROM _tool_basecamp_todos\n  WHERE project_id = '29433274'\n    AND completed = 1\n    AND completed_at IS NOT NULL\n  GROUP BY time\n),\ncombined AS (\n  SELECT COALESCE(r.time, s.time) as time,\n    COALESCE(r.bau_reported, 0) as bau_reported,\n    COALESCE(s.bau_solved, 0) as bau_solved\n  FROM weekly_reported r\n  LEFT JOIN weekly_solved s ON r.time = s.time\n  UNION\n  SELECT s.time, 0, s.bau_solved\n  FROM weekly_solved s\n  LEFT JOIN weekly_reported r ON r.time = s.time\n  WHERE r.time IS NULL\n)\nSELECT\n  time,\n  bau_reported,\n  bau_solved\nFROM combined\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "BAU Tasks (Weekly)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 21,
+      "panels": [],
+      "title": "Support",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 34
       },
       "id": 11,
       "options": {
@@ -1469,8 +1558,8 @@
       "gridPos": {
         "h": 6,
         "w": 6,
-        "x": 18,
-        "y": 24
+        "x": 6,
+        "y": 34
       },
       "id": 12,
       "options": {
@@ -1516,5 +1605,5 @@
   "timezone": "utc",
   "title": "SDLC metrics",
   "uid": "slack-deployments",
-  "version": 2
+  "version": 8
 }

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/opt/homebrew/opt/mysql-client/bin/mysql:*)",
+      "Bash(/dev/null -e \"\nWITH weekly AS \\(\n  SELECT\n    DATE\\(DATE_SUB\\(merged_date, INTERVAL WEEKDAY\\(merged_date\\) DAY\\)\\) as time,\n    additions,\n    deletions,\n    ROW_NUMBER\\(\\) OVER \\(PARTITION BY DATE\\(DATE_SUB\\(merged_date, INTERVAL WEEKDAY\\(merged_date\\) DAY\\)\\) ORDER BY additions\\) as rn_add,\n    ROW_NUMBER\\(\\) OVER \\(PARTITION BY DATE\\(DATE_SUB\\(merged_date, INTERVAL WEEKDAY\\(merged_date\\) DAY\\)\\) ORDER BY deletions\\) as rn_del,\n    COUNT\\(*\\) OVER \\(PARTITION BY DATE\\(DATE_SUB\\(merged_date, INTERVAL WEEKDAY\\(merged_date\\) DAY\\)\\)\\) as cnt\n  FROM pull_requests\n  WHERE merged_date IS NOT NULL\n\\)\nSELECT\n  time,\n  AVG\\(CASE WHEN rn_add IN \\(FLOOR\\(\\(cnt+1\\)/2\\), CEIL\\(\\(cnt+1\\)/2\\)\\) THEN additions END\\) as median_additions,\n  AVG\\(CASE WHEN rn_del IN \\(FLOOR\\(\\(cnt+1\\)/2\\), CEIL\\(\\(cnt+1\\)/2\\)\\) THEN deletions END\\) as median_deletions\nFROM weekly\nGROUP BY time\nORDER BY time DESC\nLIMIT 10;\n\")"
+    ]
+  }
+}
