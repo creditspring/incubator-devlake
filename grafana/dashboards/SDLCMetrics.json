@@ -116,7 +116,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH weekly AS (\n  SELECT\n    DATE(DATE_SUB(FROM_UNIXTIME(CAST(SUBSTRING_INDEX(ts, '.', 1) AS UNSIGNED)), INTERVAL WEEKDAY(FROM_UNIXTIME(CAST(SUBSTRING_INDEX(ts, '.', 1) AS UNSIGNED))) DAY)) as time,\n    COUNT(*) as deployments\n  FROM _tool_slack_channel_messages\n  WHERE\n    channel_id = 'CCNC39ECD'\n    AND (thread_ts = '' OR thread_ts IS NULL)\n  GROUP BY time\n)\nSELECT\n  time,\n  deployments,\n  AVG(deployments) OVER (ORDER BY time ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) as moving_avg_12w\nFROM weekly\nORDER BY time",
+          "rawSql": "WITH weekly AS (\n  SELECT\n    DATE(DATE_SUB(FROM_UNIXTIME(CAST(SUBSTRING_INDEX(ts, '.', 1) AS UNSIGNED)), INTERVAL WEEKDAY(FROM_UNIXTIME(CAST(SUBSTRING_INDEX(ts, '.', 1) AS UNSIGNED))) DAY)) as time,\n    COUNT(*) as deployments\n  FROM _tool_slack_channel_messages\n  WHERE\n    channel_id = 'CCNC39ECD'\n    AND (thread_ts = '' OR thread_ts IS NULL)\n    AND subtype = 'bot_message'\n  GROUP BY time\n)\nSELECT\n  time,\n  deployments,\n  AVG(deployments) OVER (ORDER BY time ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) as moving_avg_12w\nFROM weekly\nORDER BY time",
           "refId": "A"
         }
       ],
