@@ -154,12 +154,10 @@ func (tp *TokenProvider) refreshToken() errors.Error {
 	// Update connection with new token
 	tp.conn.UpdateToken(result.AccessToken, result.ExpiresIn)
 
-	// Persist to database
+	// Persist to database using Update (Save) so GORM's encdec serializer
+	// encrypts the token field correctly, unlike UpdateColumns which bypasses it.
 	if tp.dal != nil {
-		err := tp.dal.UpdateColumns(tp.conn, []dal.DalSet{
-			{ColumnName: "token", Value: tp.conn.Token},
-			{ColumnName: "token_expires_at", Value: tp.conn.TokenExpiresAt},
-		})
+		err := tp.dal.Update(tp.conn)
 		if err != nil {
 			tp.logger.Warn(err, "failed to persist refreshed token")
 		}
