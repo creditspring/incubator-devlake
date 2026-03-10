@@ -43,7 +43,7 @@ var _ plugin.SubTaskEntryPoint = LinkPrToTodo
 var LinkPrToTodoMeta = plugin.SubTaskMeta{
 	Name:             "LinkPrToTodo",
 	EntryPoint:       LinkPrToTodo,
-	EnabledByDefault: true,
+	EnabledByDefault: false,
 	Description:      "Link PRs to Basecamp todos via URL in PR description",
 	DependencyTables: []string{code.PullRequest{}.TableName(), ticket.Issue{}.TableName()},
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_CODE, plugin.DOMAIN_TYPE_TICKET, plugin.DOMAIN_TYPE_CROSS},

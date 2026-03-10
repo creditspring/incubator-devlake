@@ -41,6 +41,7 @@ var _ interface {
 	plugin.PluginMigration
 	plugin.CloseablePluginTask
 	plugin.DataSourcePluginBlueprintV200
+	plugin.PostSourcePlanProvider
 } = (*Basecamp)(nil)
 
 type Basecamp struct{}
@@ -216,6 +217,13 @@ func (p Basecamp) MakeDataSourcePipelinePlanV200(
 	scopes []*coreModels.BlueprintScope,
 ) (coreModels.PipelinePlan, []plugin.Scope, errors.Error) {
 	return api.MakePipelinePlanV200(p.SubTaskMetas(), connectionId, scopes)
+}
+
+func (p Basecamp) MakePostSourcePipelinePlan(
+	connectionId uint64,
+	scopes []*coreModels.BlueprintScope,
+) (coreModels.PipelinePlan, errors.Error) {
+	return api.MakePostSourcePipelinePlan(connectionId, scopes)
 }
 
 func (p Basecamp) Close(taskCtx plugin.TaskContext) errors.Error {

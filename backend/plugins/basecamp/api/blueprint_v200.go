@@ -88,6 +88,44 @@ func makePipelinePlanV200(
 	return plan, nil
 }
 
+// MakePostSourcePipelinePlan creates a plan for tasks that must run AFTER all
+// data source plugins have completed. This ensures LinkPrToTodo can see PRs
+// from all GitHub repos, not just those synced in the same pipeline stage.
+func MakePostSourcePipelinePlan(
+	connectionId uint64,
+	bpScopes []*coreModels.BlueprintScope,
+) (coreModels.PipelinePlan, errors.Error) {
+	connection, err := dsHelper.ConnSrv.FindByPk(connectionId)
+	if err != nil {
+		return nil, err
+	}
+	scopeDetails, err := dsHelper.ScopeSrv.MapScopeDetails(connectionId, bpScopes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create one task per scope with only LinkPrToTodo enabled
+	plan := make(coreModels.PipelinePlan, len(scopeDetails))
+	for i, scopeDetail := range scopeDetails {
+		scope, scopeConfig := scopeDetail.Scope, scopeDetail.ScopeConfig
+
+		optionsMap := map[string]interface{}{
+			"connectionId":  connection.ID,
+			"accountId":     scope.AccountId,
+			"scopeConfigId": scopeConfig.ID,
+		}
+		plan[i] = coreModels.PipelineStage{
+			&coreModels.PipelineTask{
+				Plugin:   "basecamp",
+				Subtasks: []string{"LinkPrToTodo"},
+				Options:  optionsMap,
+			},
+		}
+	}
+
+	return plan, nil
+}
+
 func makeScopesV200(
 	scopeDetails []*srvhelper.ScopeDetail[models.BasecampAccount, models.BasecampScopeConfig],
 	connection *models.BasecampConnection,

@@ -57,7 +57,10 @@ func CleanupData(taskCtx plugin.SubTaskContext) errors.Error {
 		&models.BasecampTodolistGroup{},
 		&models.BasecampTodolist{},
 		&models.BasecampProject{},
-		&models.PrReference{},
+		// Note: PrReference is NOT cleaned here. It is managed by the
+		// post-source LinkPrToTodo task which runs after all data sources
+		// have synced. PrReferences use deterministic IDs (FNV-64a hash)
+		// so BatchSave handles upserts correctly.
 	}
 
 	for _, table := range tablesToClean {

@@ -119,6 +119,28 @@ func GeneratePlanJsonV200(
 			)
 		}
 	}
+	// collect post-source plans from plugins that need to run after all
+	// data sources have synced (e.g., cross-plugin linking tasks)
+	var postSourcePlans []coreModels.PipelinePlan
+	for _, connection := range connections {
+		p, err := plugin.GetPlugin(connection.PluginName)
+		if err != nil {
+			return nil, err
+		}
+		if postProvider, ok := p.(plugin.PostSourcePlanProvider); ok {
+			postPlan, err := postProvider.MakePostSourcePipelinePlan(
+				connection.ConnectionId,
+				connection.Scopes,
+			)
+			if err != nil {
+				return nil, err
+			}
+			if len(postPlan) > 0 {
+				postSourcePlans = append(postSourcePlans, postPlan)
+			}
+		}
+	}
+
 	var planForProjectMapping coreModels.PipelinePlan
 	if projectName != "" {
 		p, err := plugin.GetPlugin("org")
@@ -135,6 +157,7 @@ func GeneratePlanJsonV200(
 	plan := SequentializePipelinePlans(
 		planForProjectMapping,
 		ParallelizePipelinePlans(sourcePlans...),
+		ParallelizePipelinePlans(postSourcePlans...),
 		ParallelizePipelinePlans(metricPlans...),
 	)
 	return plan, err
