@@ -92,6 +92,18 @@ type ProjectMapper interface {
 	MapProject(projectName string, scopes []Scope) (models.PipelinePlan, errors.Error)
 }
 
+// PostSourcePlanProvider is an optional interface for data source plugins that
+// need to run tasks AFTER all other data source plugins have completed.
+// This is useful for cross-plugin linking tasks (e.g., linking PRs collected
+// by GitHub to issues collected by Basecamp) that depend on data from
+// multiple plugins being available.
+type PostSourcePlanProvider interface {
+	MakePostSourcePipelinePlan(
+		connectionId uint64,
+		scopes []*models.BlueprintScope,
+	) (models.PipelinePlan, errors.Error)
+}
+
 // CompositeDataSourcePluginBlueprintV200 is for unit test
 type CompositeDataSourcePluginBlueprintV200 interface {
 	PluginMeta

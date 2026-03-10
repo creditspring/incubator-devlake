@@ -1,0 +1,170 @@
+flowchart TD
+    subgraph Trigger["1. Trigger"]
+        CRON([Cron Schedule<br/>0 0 * * *]) --> MAKEBP
+        MANUAL([Manual Trigger<br/>TriggerBlueprint]) --> MAKEBP
+        MAKEBP[MakePlanForBlueprint<br/><i>blueprint.go:359</i>]
+    end
+
+    subgraph Blueprint["Blueprint Model"]
+        BP[(Blueprint)]
+        BP --> |"has"| BPC[Connections]
+        BPC --> |"each has"| BPS[Scopes]
+        BP --> |"has"| BEFORE_PLAN[BeforePlan]
+        BP --> |"has"| AFTER_PLAN[AfterPlan]
+        BP --> |"has"| SYNC[SyncPolicy<br/>SkipCollectors, FullSync]
+    end
+
+    MAKEBP --> GEN
+
+    subgraph PlanGen["2. Plan Generation — GeneratePlanJsonV200 <i>(blueprint_makeplan_v200.go:31)</i>"]
+        GEN[GeneratePlanJsonV200]
+
+        GEN --> |"For each Connection"| PLUGGET{GetPlugin<br/>by PluginName}
+
+        PLUGGET --> |"DataSourcePluginBlueprintV200"| MAKESRC[MakeDataSourcePipelinePlanV200<br/><i>per-plugin impl</i>]
+        MAKESRC --> SRCPLANS[(sourcePlans<br/>one PipelinePlan per connection)]
+
+        PLUGGET --> |"PostSourcePlanProvider?"| MAKEPOST[MakePostSourcePipelinePlan<br/><i>optional interface</i>]
+        MAKEPOST --> POSTPLANS[(postSourcePlans<br/>tasks that must run<br/>after all sources sync)]
+
+        GEN --> |"For each Metric plugin"| MAKEMETRIC[MakeMetricPluginPipelinePlanV200]
+        MAKEMETRIC --> METRICPLANS[(metricPlans)]
+
+        GEN --> |"If projectName set"| ORGMAP[org.MapProject]
+        ORGMAP --> PROJPLAN[(planForProjectMapping)]
+    end
+
+    subgraph SkipColl["Skip Collectors Filter"]
+        SRCPLANS --> SKIPCHECK{SkipCollectors?}
+        SKIPCHECK --> |"Yes"| REMOVE[removeCollectorTasks<br/>strips collect* subtasks<br/>and gitextractor]
+        SKIPCHECK --> |"No"| FILTERED_SRC
+        REMOVE --> FILTERED_SRC[(filtered sourcePlans)]
+    end
+
+    subgraph Merge["3. Plan Merging"]
+        direction LR
+        PROJPLAN --> SEQ
+        FILTERED_SRC --> PAR_SRC[ParallelizePipelinePlans<br/>sourcePlans...]
+        POSTPLANS --> PAR_POST[ParallelizePipelinePlans<br/>postSourcePlans...]
+        METRICPLANS --> PAR_MET[ParallelizePipelinePlans<br/>metricPlans...]
+
+        PAR_SRC --> SEQ
+        PAR_POST --> SEQ
+        PAR_MET --> SEQ
+
+        SEQ[SequentializePipelinePlans]
+    end
+
+    subgraph MergeDetail["Merge Functions"]
+        direction TB
+        PARALLEL_FN["<b>ParallelizePipelinePlans</b><br/>Merges plans by stage INDEX<br/>Plans: A=[s1,s2], B=[s1]<br/>Result: [A.s1+B.s1, A.s2]<br/>Tasks in same index run in parallel"]
+
+        SEQUENTIAL_FN["<b>SequentializePipelinePlans</b><br/>Appends plans end-to-end<br/>Plans: A=[s1,s2], B=[s1]<br/>Result: [A.s1, A.s2, B.s1]<br/>One plan finishes before next starts"]
+    end
+
+    SEQ --> WRAP
+
+    subgraph BeforeAfter["4. Before/After Wrapping <i>(blueprint.go:377)</i>"]
+        BEFORE_PLAN --> WRAPSEQ
+        WRAP[Generated Plan] --> WRAPSEQ
+        AFTER_PLAN --> WRAPSEQ
+        WRAPSEQ[SequentializePipelinePlans<br/>BeforePlan + Plan + AfterPlan]
+    end
+
+    WRAPSEQ --> FINAL_PLAN
+
+    subgraph Materialize["5. DB Materialization — CreateDbPipeline <i>(pipeline_helper.go:34)</i>"]
+        FINAL_PLAN[(Final PipelinePlan<br/>2D array)] --> DBPIPE[Create Pipeline row<br/>Plan stored as JSON]
+        DBPIPE --> DBTASKS
+
+        DBTASKS["Create Task rows<br/>For Plan[i][j]:<br/>  PipelineRow = i + 1<br/>  PipelineCol = j + 1<br/>  Plugin, Subtasks, Options"]
+    end
+
+    subgraph Execute["6. Execution — RunPipeline <i>(run_pipeline.go:31)</i>"]
+        DBTASKS --> LOADTASKS[Load Tasks<br/>ORDER BY pipeline_row, pipeline_col]
+        LOADTASKS --> REGROUP[Group by PipelineRow<br/>into taskIds 2D array]
+
+        REGROUP --> STAGE_LOOP
+
+        STAGE_LOOP[For each stage sequentially] --> PARALLEL_EXEC
+        PARALLEL_EXEC[Launch all tasks in stage<br/>concurrently via goroutines] --> WAIT[Wait for all tasks<br/>in stage to complete]
+        WAIT --> |"Next stage"| STAGE_LOOP
+        WAIT --> |"All stages done"| DONE([Pipeline Complete])
+    end
+
+    subgraph TaskExec["7. Task Execution — RunPluginSubTasks <i>(run_task.go:175)</i>"]
+        RUNTASK[RunPluginTask] --> PREPARE[PrepareTaskData<br/>creates plugin-specific context]
+        PREPARE --> SUBTASK_FILTER
+
+        SUBTASK_FILTER[Build subtask flags]
+        SUBTASK_FILTER --> |"1"| DEFAULTS[Start with EnabledByDefault<br/>from SubTaskMeta]
+        DEFAULTS --> |"2"| EXPLICIT{task.Subtasks<br/>specified?}
+        EXPLICIT --> |"Yes: disable all,<br/>enable only listed"| POLICY_CHK
+        EXPLICIT --> |"No: use defaults"| POLICY_CHK
+        POLICY_CHK --> |"3"| SKIPCOLL{SkipCollectors?}
+        SKIPCOLL --> |"Yes"| DISABLE_COLL[Disable collect* subtasks]
+        SKIPCOLL --> |"No"| REQUIRED_CHK
+        DISABLE_COLL --> REQUIRED_CHK
+        REQUIRED_CHK --> |"4"| FORCE[Force-enable Required subtasks]
+        FORCE --> RUN_SUBTASKS[Execute enabled subtasks<br/>sequentially]
+        RUN_SUBTASKS --> CLOSE[plugin.Close]
+    end
+
+    subgraph PluginPlan["Plugin Plan Generation — MakePipelinePlanTask <i>(pipeline_plan.go:60)</i>"]
+        MPTASK[MakePipelinePlanTask<br/>pluginName, subtaskMetas,<br/>entities, options]
+        MPTASK --> ENV_OVERRIDE[Override EnabledByDefault<br/>from ENABLE_SUBTASKS_BY_DEFAULT<br/>env var]
+        ENV_OVERRIDE --> FILTER_SUBS[MakePipelinePlanSubtasks<br/>Keep subtask if:<br/>  EnabledByDefault = true AND<br/>  DomainTypes matches entities]
+        FILTER_SUBS --> PTASK[(PipelineTask<br/>Plugin + Subtasks + Options)]
+    end
+
+    subgraph Example["Example: Blueprint with Basecamp + 10 GitHub repos"]
+        direction TB
+        EX_NOTE["
+        <b>Source Plans (ParallelizePipelinePlans):</b>
+        Basecamp plan: [stage1_collection]
+        GitHub repo1:  [stage1]
+        GitHub repo2:  [stage1]
+        ...
+        GitHub repo10: [stage1]
+
+        After ParallelizePipelinePlans:
+        Stage 1: Basecamp + repo1   (parallel, repo1 ~2min, Basecamp ~100min)
+        Stage 2: repo2              (starts after Stage 1)
+        Stage 3: repo3
+        ...
+        Stage 10: repo10
+
+        <b>Post-Source Plans (after all sources):</b>
+        Basecamp LinkPrToTodo: [stage1]
+
+        <b>Final SequentializePipelinePlans:</b>
+        Stage 1:  Basecamp(collect/convert) + repo1
+        Stage 2:  repo2
+        ...
+        Stage 10: repo10
+        Stage 11: Basecamp(LinkPrToTodo)   ← sees ALL PRs
+        Stage 12: Metric plugins
+        "]
+    end
+
+    %% Styling
+    classDef trigger fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef blueprint fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef gen fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef merge fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef db fill:#fce4ec,stroke:#c62828,stroke-width:2px
+    classDef exec fill:#e0f2f1,stroke:#00695c,stroke-width:2px
+    classDef task fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef plugin fill:#e8eaf6,stroke:#283593,stroke-width:2px
+    classDef example fill:#f5f5f5,stroke:#616161,stroke-width:1px
+
+    class CRON,MANUAL,MAKEBP trigger
+    class BP,BPC,BPS,BEFORE_PLAN,AFTER_PLAN,SYNC blueprint
+    class GEN,PLUGGET,MAKESRC,MAKEPOST,MAKEMETRIC,ORGMAP,SRCPLANS,POSTPLANS,METRICPLANS,PROJPLAN gen
+    class PAR_SRC,PAR_POST,PAR_MET,SEQ,PARALLEL_FN,SEQUENTIAL_FN,WRAP,WRAPSEQ merge
+    class FINAL_PLAN,DBPIPE,DBTASKS db
+    class LOADTASKS,REGROUP,STAGE_LOOP,PARALLEL_EXEC,WAIT,DONE exec
+    class RUNTASK,PREPARE,SUBTASK_FILTER,DEFAULTS,EXPLICIT,POLICY_CHK,SKIPCOLL,DISABLE_COLL,REQUIRED_CHK,FORCE,RUN_SUBTASKS,CLOSE task
+    class MPTASK,ENV_OVERRIDE,FILTER_SUBS,PTASK plugin
+    class EX_NOTE example
+    class SKIPCHECK,REMOVE,FILTERED_SRC gen
