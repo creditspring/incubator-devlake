@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"sync/atomic"
 	"testing"
 
@@ -323,6 +324,7 @@ func TestResolveTodo_429ExhaustedRetries(t *testing.T) {
 }
 
 func TestBasecampProjectRegex(t *testing.T) {
+	basecampProjectRegex := regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/projects/(\d+)`)
 	tests := []struct {
 		name      string
 		url       string
@@ -370,6 +372,7 @@ func TestBasecampProjectRegex(t *testing.T) {
 }
 
 func TestBasecampBucketItemRegex(t *testing.T) {
+	basecampBucketItemRegex := regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/buckets/(\d+)/(todolists|messages)/(\d+)`)
 	tests := []struct {
 		name      string
 		url       string
@@ -425,6 +428,7 @@ func TestBasecampBucketItemRegex(t *testing.T) {
 }
 
 func TestBasecampBucketItemRegex_MultipleInText(t *testing.T) {
+	basecampBucketItemRegex := regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/buckets/(\d+)/(todolists|messages)/(\d+)`)
 	text := `Related items:
 - https://3.basecamp.com/111/buckets/222/todolists/333
 - https://3.basecamp.com/111/buckets/222/messages/444`
