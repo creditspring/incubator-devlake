@@ -55,6 +55,16 @@ var LinkPrToTodoMeta = plugin.SubTaskMeta{
 // Captures: [1]=account_id, [2]=bucket_id, [3]=todo_id
 var basecampTodoRegex = regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/buckets/(\d+)/todos/(\d+)`)
 
+// basecampProjectRegex matches Basecamp project URLs
+// Format: https://3.basecamp.com/{account}/projects/{project_id}
+// Captures: [1]=account_id, [2]=project_id
+var basecampProjectRegex = regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/projects/(\d+)`)
+
+// basecampBucketItemRegex matches Basecamp bucket item URLs (todolists, messages)
+// Format: https://3.basecamp.com/{account}/buckets/{bucket_id}/{type}/{item_id}
+// Captures: [1]=account_id, [2]=bucket_id, [3]=type (todolists|messages), [4]=item_id
+var basecampBucketItemRegex = regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/buckets/(\d+)/(todolists|messages)/(\d+)`)
+
 // urlRegex matches any http/https URL
 var urlRegex = regexp.MustCompile(`https?://[^\s<>\[\]()'"]+`)
 
@@ -82,37 +92,65 @@ func parseTime(s string) *time.Time {
 // resolveTodo resolves a possibly-moved todo by calling the Basecamp API.
 // If the todo was moved, the API redirects and returns JSON with the current todo.
 // Results are cached in resolvedTodos to avoid redundant API calls.
-// A nil value in the cache means a previous lookup failed.
+// A nil value in the cache means a previous lookup failed (not retryable).
+// Respects Basecamp's rate limit (50 req/10s) by throttling between calls,
+// and retries on 429 using the Retry-After header.
 func resolveTodo(
 	apiClient *api.ApiClient,
 	logger coreLog.Logger,
 	resolvedTodos map[string]*BasecampApiTodo,
 	accountId, bucketId, todoId string,
+	throttle *time.Ticker,
 ) *BasecampApiTodo {
 	if apiTodo, ok := resolvedTodos[todoId]; ok {
 		return apiTodo
 	}
+
+	// Throttle to respect Basecamp rate limits (50 req / 10 sec = 200ms between calls)
+	if throttle != nil {
+		<-throttle.C
+	}
+
 	path := fmt.Sprintf("%s/buckets/%s/todos/%s.json", accountId, bucketId, todoId)
-	resp, err := apiClient.Get(path, nil, nil)
-	if err != nil {
-		logger.Warn(err, "failed to resolve todo %s via API", todoId)
-		resolvedTodos[todoId] = nil
-		return nil
+
+	const maxRetries = 3
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		resp, err := apiClient.Get(path, nil, nil)
+		if err != nil {
+			logger.Warn(err, "failed to resolve todo %s via API", todoId)
+			resolvedTodos[todoId] = nil
+			return nil
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			retryAfter := resp.Header.Get("Retry-After")
+			wait := 10 * time.Second // default wait
+			if seconds, parseErr := strconv.Atoi(retryAfter); parseErr == nil && seconds > 0 {
+				wait = time.Duration(seconds) * time.Second
+			}
+			logger.Info("Rate limited (429) resolving todo %s, retrying after %s (attempt %d/%d)", todoId, wait, attempt+1, maxRetries)
+			time.Sleep(wait)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			logger.Warn(nil, "API returned %d resolving todo %s", resp.StatusCode, todoId)
+			resp.Body.Close()
+			resolvedTodos[todoId] = nil
+			return nil
+		}
+		var apiTodo BasecampApiTodo
+		if unmarshalErr := api.UnmarshalResponse(resp, &apiTodo); unmarshalErr != nil {
+			logger.Warn(unmarshalErr, "failed to unmarshal API response for todo %s", todoId)
+			resolvedTodos[todoId] = nil
+			return nil
+		}
+		resolvedTodos[todoId] = &apiTodo
+		return &apiTodo
 	}
-	if resp.StatusCode != http.StatusOK {
-		logger.Warn(nil, "API returned %d resolving todo %s", resp.StatusCode, todoId)
-		resp.Body.Close()
-		resolvedTodos[todoId] = nil
-		return nil
-	}
-	var apiTodo BasecampApiTodo
-	if unmarshalErr := api.UnmarshalResponse(resp, &apiTodo); unmarshalErr != nil {
-		logger.Warn(unmarshalErr, "failed to unmarshal API response for todo %s", todoId)
-		resolvedTodos[todoId] = nil
-		return nil
-	}
-	resolvedTodos[todoId] = &apiTodo
-	return &apiTodo
+
+	logger.Warn(nil, "exhausted retries resolving todo %s after repeated 429s", todoId)
+	resolvedTodos[todoId] = nil
+	return nil
 }
 
 func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
@@ -149,10 +187,27 @@ func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
 		todoIdMap[todo.TodoId] = domainId
 	}
 
+	// Build a map of project IDs for quick lookup
+	var projects []models.BasecampProject
+	if err := db.All(&projects,
+		dal.From(&models.BasecampProject{}),
+		dal.Where("connection_id = ?", data.Options.ConnectionId),
+	); err != nil {
+		return err
+	}
+	projectMap := make(map[string]*models.BasecampProject)
+	for i := range projects {
+		projectMap[projects[i].ProjectId] = &projects[i]
+	}
+
 	// Cache for API-resolved todos (for moved or uncollected todos)
 	resolvedTodos := make(map[string]*BasecampApiTodo)
 
-	logger.Info("Processing PRs: extracting URLs and linking to %d todos", len(todoIdMap))
+	// Throttle API calls to respect Basecamp rate limit (50 req / 10 sec)
+	throttle := time.NewTicker(200 * time.Millisecond)
+	defer throttle.Stop()
+
+	logger.Info("Processing PRs: extracting URLs and linking to %d todos (from %d projects)", len(todoIdMap), len(projectMap))
 
 	enricher, err := api.NewDataEnricher(api.DataEnricherArgs[code.PullRequest]{
 		Ctx:   taskCtx,
@@ -193,7 +248,7 @@ func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
 						var apiTodo *BasecampApiTodo
 						if _, exists := todoIdMap[todoId]; !exists {
 							// Todo not found — it may have been moved or not collected. Resolve via API.
-							apiTodo = resolveTodo(data.ApiClient.ApiClient, logger, resolvedTodos, accountId, bucketId, todoId)
+							apiTodo = resolveTodo(data.ApiClient.ApiClient, logger, resolvedTodos, accountId, bucketId, todoId, throttle)
 							if apiTodo == nil {
 								continue
 							}
@@ -276,6 +331,40 @@ func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
 							todoIdMap[effectiveTodoId] = domainId
 
 							logger.Info("Created domain records for uncollected todo %s (project %s %q)", effectiveTodoId, projectId, apiTodo.Bucket.Name)
+						}
+					}
+				}
+
+				// Match /projects/{id} URLs → link PR to board
+				projectMatches := basecampProjectRegex.FindAllStringSubmatch(text, -1)
+				for _, match := range projectMatches {
+					if len(match) == 3 {
+						projectId := match[2]
+						if proj, exists := projectMap[projectId]; exists {
+							boardId := projectIdGen.Generate(data.Options.ConnectionId, projectId)
+							results = append(results, &crossdomain.PullRequestIssue{
+								PullRequestId:  pr.Id,
+								IssueId:        boardId,
+								PullRequestKey: pr.PullRequestKey,
+								IssueKey:       proj.ProjectId,
+							})
+						}
+					}
+				}
+
+				// Match /buckets/{id}/todolists|messages/{id} URLs → link PR to board
+				bucketItemMatches := basecampBucketItemRegex.FindAllStringSubmatch(text, -1)
+				for _, match := range bucketItemMatches {
+					if len(match) == 5 {
+						bucketId := match[2] // bucket ID is the project ID
+						if _, exists := projectMap[bucketId]; exists {
+							boardId := projectIdGen.Generate(data.Options.ConnectionId, bucketId)
+							results = append(results, &crossdomain.PullRequestIssue{
+								PullRequestId:  pr.Id,
+								IssueId:        boardId,
+								PullRequestKey: pr.PullRequestKey,
+								IssueKey:       bucketId,
+							})
 						}
 					}
 				}
