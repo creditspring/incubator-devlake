@@ -18,13 +18,13 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "id": 44,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
-      "datasource": {
-        "type": "datasource",
-        "uid": "grafana"
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
       },
       "gridPos": {
         "h": 3,
@@ -42,17 +42,7 @@
         "content": "This dashboard displays merged GitHub pull requests with linked Basecamp projects. It shows PR details including repository, title, merge date, lead time (hours from creation to merge), author, external references, and associated Basecamp project names. Bot PRs (depfu) are excluded.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "datasource",
-            "uid": "grafana"
-          },
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
+      "pluginVersion": "11.6.2",
       "title": "Dashboard Description",
       "type": "text"
     },
@@ -77,8 +67,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
-                "value": null
+                "color": "text"
               }
             ]
           }
@@ -146,8 +135,7 @@
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "green",
-                      "value": null
+                      "color": "green"
                     },
                     {
                       "color": "yellow",
@@ -283,7 +271,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "11.6.2",
       "targets": [
         {
           "datasource": "mysql",
@@ -293,7 +281,7 @@
           "metricColumn": "none",
           "queryType": "randomWalk",
           "rawQuery": true,
-          "rawSql": "SELECT\n  r.name AS repo,\n  pr.title,\n  pr.merged_date AS merged_at,\n  ROUND(TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) / 60, 2) AS lead_time,\n  'View PR' AS url,\n  pr.url AS url_hidden,\n  pr.author_name AS author,\n  GROUP_CONCAT(DISTINCT prl.label_name SEPARATOR ', ') AS labels,\n  GROUP_CONCAT(DISTINCT ref.url SEPARATOR ', ') AS `references`,\n  GROUP_CONCAT(DISTINCT COALESCE(i.original_project, '') SEPARATOR ', ') AS basecamp_project\nFROM pull_requests pr\n  JOIN repos r ON pr.base_repo_id = r.id\n  LEFT JOIN pull_request_labels prl ON pr.id = prl.pull_request_id\n  LEFT JOIN _tool_pr_references ref ON pr.id = ref.pull_request_id\n  LEFT JOIN pull_request_issues pri ON pr.id = pri.pull_request_id\n  LEFT JOIN issues i ON pri.issue_id = i.id AND i.original_type = 'todo'\nWHERE\n  pr.status = 'MERGED'\n  AND pr.author_name NOT LIKE '%depfu%'\n  AND $__timeFilter(pr.merged_date)\nGROUP BY pr.id, r.name, pr.title, pr.merged_date, pr.created_date, pr.url, pr.author_name\nORDER BY pr.merged_date DESC",
+          "rawSql": "SELECT\n  r.name AS repo,\n  pr.title,\n  DATE(pr.merged_date) AS merged_at,\n  ROUND(TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) / 60, 2) AS lead_time,\n  'View PR' AS url,\n  pr.url AS url_hidden,\n  pr.author_name AS author,\n  GROUP_CONCAT(DISTINCT prl.label_name SEPARATOR ', ') AS labels,\n  GROUP_CONCAT(DISTINCT ref.url SEPARATOR ', ') AS `references`,\n  CASE\n    WHEN GROUP_CONCAT(DISTINCT COALESCE(i.original_project, b.name) SEPARATOR ', ') IS NOT NULL\n      THEN GROUP_CONCAT(DISTINCT COALESCE(i.original_project, b.name) SEPARATOR ', ')\n    WHEN SUM(ref.url LIKE '%3.basecamp.com/4450519/buckets/26549168/todos/%') > 0\n      THEN 'Engineering BAU Activities'\n    WHEN SUM(ref.url LIKE '%3.basecamp.com/%/buckets/%/todos/%') > 0\n      THEN 'Possibly moved'\n    ELSE ''\n  END AS basecamp_project\nFROM pull_requests pr\n  JOIN repos r ON pr.base_repo_id = r.id\n  LEFT JOIN pull_request_labels prl ON pr.id = prl.pull_request_id\n  LEFT JOIN _tool_pr_references ref ON pr.id = ref.pull_request_id\n  LEFT JOIN pull_request_issues pri ON pr.id = pri.pull_request_id\n  LEFT JOIN issues i ON pri.issue_id = i.id\n  LEFT JOIN boards b ON pri.issue_id = b.id\nWHERE\n  pr.status = 'MERGED'\n  AND pr.author_name NOT LIKE '%depfu%'\n  AND $__timeFilter(pr.merged_date)\nGROUP BY pr.id, r.name, pr.title, pr.merged_date, pr.created_date, pr.url, pr.author_name\nORDER BY pr.merged_date DESC",
           "refId": "A",
           "select": [
             [
@@ -338,8 +326,9 @@
       "type": "table"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 41,
   "tags": [
     "GitHub",
     "Basecamp"
@@ -354,6 +343,6 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "Code changes report",
-  "uid": "github-pr-basecamp-links",
-  "version": 2
+  "uid": "code-changes-report",
+  "version": 1
 }
