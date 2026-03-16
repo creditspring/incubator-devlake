@@ -55,16 +55,6 @@ var LinkPrToTodoMeta = plugin.SubTaskMeta{
 // Captures: [1]=account_id, [2]=bucket_id, [3]=todo_id
 var basecampTodoRegex = regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/buckets/(\d+)/todos/(\d+)`)
 
-// basecampProjectRegex matches Basecamp project URLs
-// Format: https://3.basecamp.com/{account}/projects/{project_id}
-// Captures: [1]=account_id, [2]=project_id
-var basecampProjectRegex = regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/projects/(\d+)`)
-
-// basecampBucketItemRegex matches Basecamp bucket item URLs (todolists, messages)
-// Format: https://3.basecamp.com/{account}/buckets/{bucket_id}/{type}/{item_id}
-// Captures: [1]=account_id, [2]=bucket_id, [3]=type (todolists|messages), [4]=item_id
-var basecampBucketItemRegex = regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/buckets/(\d+)/(todolists|messages)/(\d+)`)
-
 // urlRegex matches any http/https URL
 var urlRegex = regexp.MustCompile(`https?://[^\s<>\[\]()'"]+`)
 
@@ -158,6 +148,10 @@ func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*BasecampTaskData)
 	logger := taskCtx.GetLogger()
 
+	// Regexes for non-todo Basecamp URLs (project pages, todolists, messages)
+	basecampProjectRegex := regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/projects/(\d+)`)
+	basecampBucketItemRegex := regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/buckets/(\d+)/(todolists|messages)/(\d+)`)
+
 	// Create ID generators
 	todoIdGen := didgen.NewDomainIdGenerator(&models.BasecampTodo{})
 	projectIdGen := didgen.NewDomainIdGenerator(&models.BasecampProject{})
@@ -188,14 +182,14 @@ func LinkPrToTodo(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	// Build a map of project IDs for quick lookup
-	var projects []models.BasecampProject
+	projects := make([]models.BasecampProject, 0)
 	if err := db.All(&projects,
 		dal.From(&models.BasecampProject{}),
 		dal.Where("connection_id = ?", data.Options.ConnectionId),
 	); err != nil {
 		return err
 	}
-	projectMap := make(map[string]*models.BasecampProject)
+	projectMap := make(map[string]*models.BasecampProject, len(projects))
 	for i := range projects {
 		projectMap[projects[i].ProjectId] = &projects[i]
 	}
