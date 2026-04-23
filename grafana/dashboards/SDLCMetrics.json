@@ -114,10 +114,28 @@
       "targets": [
         {
           "datasource": "mysql",
+          "editorMode": "code",
           "format": "table",
           "rawQuery": true,
           "rawSql": "WITH weekly AS (\n  SELECT\n    DATE(DATE_SUB(FROM_UNIXTIME(CAST(SUBSTRING_INDEX(ts, '.', 1) AS UNSIGNED)), INTERVAL WEEKDAY(FROM_UNIXTIME(CAST(SUBSTRING_INDEX(ts, '.', 1) AS UNSIGNED))) DAY)) as time,\n    COUNT(*) as deployments\n  FROM _tool_slack_channel_messages\n  WHERE\n    channel_id = 'CCNC39ECD'\n    AND (thread_ts = '' OR thread_ts IS NULL)\n    AND subtype = 'bot_message'\n  GROUP BY time\n)\nSELECT\n  time,\n  deployments,\n  AVG(deployments) OVER (ORDER BY time ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) as moving_avg_12w\nFROM weekly\nORDER BY time",
-          "refId": "A"
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
         }
       ],
       "title": "Weekly Deployments",
@@ -1210,10 +1228,28 @@
       "targets": [
         {
           "datasource": "mysql",
+          "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH todoset_mapping AS (\n  SELECT DISTINCT\n    SUBSTRING_INDEX(SUBSTRING_INDEX(r.input, 'TodosetId\": \"', -1), '\"', 1) as todoset_id,\n    TRIM(SUBSTRING(r.data, 7, LOCATE(',', r.data) - 7)) as todolist_id,\n    CASE\n      WHEN r.input LIKE '%29433274%' THEN '29433274'\n      ELSE '26549168'\n    END as project_id\n  FROM _raw_basecamp_todolists r\n  WHERE r.input LIKE '%29433274%' OR r.input LIKE '%26549168%'\n),\ntodoset_groups AS (\n  SELECT m.todoset_id, g.group_id as todolist_id, m.project_id\n  FROM todoset_mapping m\n  JOIN _tool_basecamp_todolist_groups g ON m.todolist_id = g.todolist_id\n    AND g.project_id = m.project_id\n  UNION\n  SELECT todoset_id, todolist_id, project_id FROM todoset_mapping\n),\nweeks AS (\n  SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as week_start\n  FROM _tool_basecamp_todos WHERE project_id IN ('29433274', '26549168')\n  UNION\n  SELECT DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY))\n  FROM _tool_basecamp_todos WHERE project_id IN ('29433274', '26549168') AND completed_at IS NOT NULL\n)\nSELECT\n  w.week_start as time,\n  SUM(CASE WHEN tg.todoset_id = '7138095528' THEN 1 ELSE 0 END) as Engineering,\n  SUM(CASE WHEN tg.todoset_id = '8062742858' THEN 1 ELSE 0 END) as Prioritised,\n  SUM(CASE WHEN tg.todoset_id = '5355919599' THEN 1 ELSE 0 END) as Requests,\n  SUM(CASE WHEN tg.todoset_id = '8035997784' THEN 1 ELSE 0 END) as `Product Backlog`,\n  SUM(CASE WHEN tg.todoset_id = '7794092682' THEN 1 ELSE 0 END) as `Product Cycle`\nFROM weeks w\nCROSS JOIN todoset_groups tg\nJOIN _tool_basecamp_todos t ON t.todo_list_id = tg.todolist_id\n  AND t.project_id = tg.project_id\n  AND t.created_at <= DATE_ADD(w.week_start, INTERVAL 6 DAY)\n  AND (t.completed_at IS NULL OR t.completed_at > DATE_ADD(w.week_start, INTERVAL 6 DAY))\nGROUP BY w.week_start\nORDER BY w.week_start",
-          "refId": "A"
+          "rawSql": "WITH todoset_mapping AS (\n  SELECT DISTINCT\n    SUBSTRING_INDEX(SUBSTRING_INDEX(r.input, 'TodosetId\": \"', -1), '\"', 1) as todoset_id,\n    TRIM(SUBSTRING(r.data, 7, LOCATE(',', r.data) - 7)) as todolist_id,\n    CASE\n      WHEN r.input LIKE '%29433274%' THEN '29433274'\n      ELSE '26549168'\n    END as project_id\n  FROM _raw_basecamp_todolists r\n  WHERE r.input LIKE '%29433274%' OR r.input LIKE '%26549168%'\n),\ntodoset_groups AS (\n  SELECT m.todoset_id, g.group_id as todolist_id, m.project_id\n  FROM todoset_mapping m\n  JOIN _tool_basecamp_todolist_groups g ON m.todolist_id = g.todolist_id\n    AND g.project_id = m.project_id\n  UNION\n  SELECT todoset_id, todolist_id, project_id FROM todoset_mapping\n),\nweeks AS (\n  SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as week_start\n  FROM _tool_basecamp_todos WHERE project_id IN ('29433274', '26549168')\n  UNION\n  SELECT DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY))\n  FROM _tool_basecamp_todos WHERE project_id IN ('29433274', '26549168') AND completed_at IS NOT NULL\n)\nSELECT\n  w.week_start as time,\n  SUM(CASE WHEN tg.todoset_id = '7138095528' THEN 1 ELSE 0 END) as 'Internal Open EngBAU Todos',\n  SUM(CASE WHEN tg.todoset_id = '8062742858' THEN 1 ELSE 0 END) as 'Prioritised EngBAU ThisCycle Todos',\n  SUM(CASE WHEN tg.todoset_id = '5355919599' THEN 1 ELSE 0 END) as 'Other Open EngBAU Todos',\n  SUM(CASE WHEN tg.todoset_id = '8035997784' THEN 1 ELSE 0 END) as `Product Team BAU Board Backlog`,\n  SUM(CASE WHEN tg.todoset_id = '7794092682' THEN 1 ELSE 0 END) as `Product Team BAU Board CyclePriorities`\nFROM weeks w\nCROSS JOIN todoset_groups tg\nJOIN _tool_basecamp_todos t ON t.todo_list_id = tg.todolist_id\n  AND t.project_id = tg.project_id\n  AND t.created_at <= DATE_ADD(w.week_start, INTERVAL 6 DAY)\n  AND (t.completed_at IS NULL OR t.completed_at > DATE_ADD(w.week_start, INTERVAL 6 DAY))\nGROUP BY w.week_start\nORDER BY w.week_start",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
         }
       ],
       "title": "Open BAU by Todoset",
@@ -1273,7 +1309,53 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Low"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Medium"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "High"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 6,
@@ -1605,5 +1687,5 @@
   "timezone": "utc",
   "title": "SDLC metrics",
   "uid": "slack-deployments",
-  "version": 8
+  "version": 13
 }

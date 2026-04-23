@@ -269,7 +269,12 @@
           "show": false
         },
         "showHeader": true,
-        "sortBy": []
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "basecamp_project"
+          }
+        ]
       },
       "pluginVersion": "11.6.2",
       "targets": [
@@ -344,5 +349,5 @@
   "timezone": "browser",
   "title": "Code changes report",
   "uid": "code-changes-report",
-  "version": 1
+  "version": 3
 }
