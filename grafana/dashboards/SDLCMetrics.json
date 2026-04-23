@@ -1163,8 +1163,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 100,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -1173,7 +1173,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
-            "lineWidth": 1,
+            "lineWidth": 0,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -1182,7 +1182,7 @@
             "spanNulls": false,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -1270,8 +1270,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 100,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -1280,7 +1280,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
-            "lineWidth": 1,
+            "lineWidth": 0,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -1289,7 +1289,7 @@
             "spanNulls": false,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -1472,11 +1472,343 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH weekly_reported AS (\n  SELECT\n    DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as time,\n    COUNT(*) as bau_reported\n  FROM _tool_basecamp_todos\n  WHERE project_id = '29433274'\n  GROUP BY time\n),\nweekly_solved AS (\n  SELECT\n    DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY)) as time,\n    COUNT(*) as bau_solved\n  FROM _tool_basecamp_todos\n  WHERE project_id = '29433274'\n    AND completed = 1\n    AND completed_at IS NOT NULL\n  GROUP BY time\n),\ncombined AS (\n  SELECT COALESCE(r.time, s.time) as time,\n    COALESCE(r.bau_reported, 0) as bau_reported,\n    COALESCE(s.bau_solved, 0) as bau_solved\n  FROM weekly_reported r\n  LEFT JOIN weekly_solved s ON r.time = s.time\n  UNION\n  SELECT s.time, 0, s.bau_solved\n  FROM weekly_solved s\n  LEFT JOIN weekly_reported r ON r.time = s.time\n  WHERE r.time IS NULL\n)\nSELECT\n  time,\n  bau_reported,\n  bau_solved\nFROM combined\nORDER BY time",
+          "rawSql": "WITH bau_solved AS (\n  SELECT\n    DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY)) as time,\n    COUNT(*) as cnt\n  FROM _tool_basecamp_todos\n  WHERE project_id = '29433274'\n    AND completed = 1\n    AND completed_at IS NOT NULL\n  GROUP BY time\n),\nfixes_solved AS (\n  SELECT\n    DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY)) as time,\n    COUNT(*) as cnt\n  FROM _tool_basecamp_todos\n  WHERE project_id = '16186768'\n    AND completed = 1\n    AND completed_at IS NOT NULL\n  GROUP BY time\n),\nweeks AS (\n  SELECT time FROM bau_solved\n  UNION\n  SELECT time FROM fixes_solved\n)\nSELECT\n  w.time,\n  COALESCE(b.cnt, 0) as bau_solved,\n  COALESCE(f.cnt, 0) as fixes_solved\nFROM weeks w\nLEFT JOIN bau_solved b ON w.time = b.time\nLEFT JOIN fixes_solved f ON w.time = f.time\nORDER BY w.time",
           "refId": "A"
         }
       ],
-      "title": "BAU Tasks (Weekly)",
+      "title": "BAU and Fixes activity",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 100,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 0,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "< 1 month"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "1-3 months"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "3-12 months"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "1-2 years"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "2+ years"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 27
+      },
+      "id": 23,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH todoset_mapping AS (\n  SELECT DISTINCT\n    SUBSTRING_INDEX(SUBSTRING_INDEX(r.input, 'TodosetId\": \"', -1), '\"', 1) as todoset_id,\n    TRIM(SUBSTRING(r.data, 7, LOCATE(',', r.data) - 7)) as todolist_id,\n    CASE\n      WHEN r.input LIKE '%29433274%' THEN '29433274'\n      ELSE '26549168'\n    END as project_id\n  FROM _raw_basecamp_todolists r\n  WHERE r.input LIKE '%29433274%' OR r.input LIKE '%26549168%'\n),\ntodoset_groups AS (\n  SELECT m.todoset_id, g.group_id as todolist_id, m.project_id\n  FROM todoset_mapping m\n  JOIN _tool_basecamp_todolist_groups g ON m.todolist_id = g.todolist_id\n    AND g.project_id = m.project_id\n  UNION\n  SELECT todoset_id, todolist_id, project_id FROM todoset_mapping\n),\nvalid_todos AS (\n  SELECT DISTINCT t.todo_id, t.created_at, t.completed_at\n  FROM _tool_basecamp_todos t\n  JOIN todoset_groups tg ON t.todo_list_id = tg.todolist_id\n    AND t.project_id = tg.project_id\n),\nweeks AS (\n  SELECT DISTINCT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as week_start\n  FROM valid_todos\n  UNION\n  SELECT DISTINCT DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY))\n  FROM valid_todos WHERE completed_at IS NOT NULL\n)\nSELECT\n  w.week_start as time,\n  SUM(CASE WHEN DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) < 30 THEN 1 ELSE 0 END) as '< 1 month',\n  SUM(CASE WHEN DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) >= 30 AND DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) < 90 THEN 1 ELSE 0 END) as '1-3 months',\n  SUM(CASE WHEN DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) >= 90 AND DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) < 365 THEN 1 ELSE 0 END) as '3-12 months',\n  SUM(CASE WHEN DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) >= 365 AND DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) < 730 THEN 1 ELSE 0 END) as '1-2 years',\n  SUM(CASE WHEN DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) >= 730 THEN 1 ELSE 0 END) as '2+ years'\nFROM weeks w\nJOIN valid_todos t ON t.created_at <= DATE_ADD(w.week_start, INTERVAL 6 DAY)\n  AND (t.completed_at IS NULL OR t.completed_at > DATE_ADD(w.week_start, INTERVAL 6 DAY))\nGROUP BY w.week_start\nORDER BY w.week_start",
+          "refId": "A"
+        }
+      ],
+      "title": "Open BAU Todos by Age",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 100,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 0,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "< 1 month"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "1-3 months"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "3-12 months"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "1-2 years"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "2+ years"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 33
+      },
+      "id": 24,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH weeks AS (\n  SELECT DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as week_start\n  FROM _tool_basecamp_todos WHERE project_id = '16186768'\n  UNION\n  SELECT DATE(DATE_SUB(completed_at, INTERVAL WEEKDAY(completed_at) DAY))\n  FROM _tool_basecamp_todos WHERE project_id = '16186768' AND completed_at IS NOT NULL\n)\nSELECT\n  w.week_start as time,\n  SUM(CASE WHEN DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) < 30 THEN 1 ELSE 0 END) as '< 1 month',\n  SUM(CASE WHEN DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) >= 30 AND DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) < 90 THEN 1 ELSE 0 END) as '1-3 months',\n  SUM(CASE WHEN DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) >= 90 AND DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) < 365 THEN 1 ELSE 0 END) as '3-12 months',\n  SUM(CASE WHEN DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) >= 365 AND DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) < 730 THEN 1 ELSE 0 END) as '1-2 years',\n  SUM(CASE WHEN DATEDIFF(DATE_ADD(w.week_start, INTERVAL 6 DAY), t.created_at) >= 730 THEN 1 ELSE 0 END) as '2+ years'\nFROM weeks w\nJOIN _tool_basecamp_todos t ON t.project_id = '16186768'\n  AND t.created_at <= DATE_ADD(w.week_start, INTERVAL 6 DAY)\n  AND (t.completed_at IS NULL OR t.completed_at > DATE_ADD(w.week_start, INTERVAL 6 DAY))\nGROUP BY w.week_start\nORDER BY w.week_start",
+          "refId": "A"
+        }
+      ],
+      "title": "Open Fixes by Age",
       "type": "timeseries"
     },
     {
@@ -1485,7 +1817,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 33
+        "y": 39
       },
       "id": 21,
       "panels": [],
@@ -1552,7 +1884,7 @@
         "h": 6,
         "w": 6,
         "x": 0,
-        "y": 34
+        "y": 40
       },
       "id": 11,
       "options": {
@@ -1641,7 +1973,7 @@
         "h": 6,
         "w": 6,
         "x": 6,
-        "y": 34
+        "y": 40
       },
       "id": 12,
       "options": {
@@ -1687,5 +2019,5 @@
   "timezone": "utc",
   "title": "SDLC metrics",
   "uid": "slack-deployments",
-  "version": 13
+  "version": 19
 }
