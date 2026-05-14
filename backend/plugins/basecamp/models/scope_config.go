@@ -35,6 +35,9 @@ type BasecampScopeConfig struct {
 	// TodoAgeLimitMonths is the number of months to look back for todos (0 = no limit)
 	// Todos older than this (based on updated_at) won't be synced
 	TodoAgeLimitMonths int `mapstructure:"todoAgeLimitMonths" json:"todoAgeLimitMonths"`
+	// DocumentVaultUrls is a newline-separated list of Basecamp vault URLs to sync documents from.
+	// Format: https://3.basecamp.com/{account}/buckets/{project_id}/vaults/{vault_id}
+	DocumentVaultUrls string `mapstructure:"documentVaultUrls" json:"documentVaultUrls" gorm:"type:text"`
 }
 
 func (BasecampScopeConfig) TableName() string {

@@ -53,6 +53,7 @@ func CleanupData(taskCtx plugin.SubTaskContext) errors.Error {
 
 	tablesToClean := []dal.Tabler{
 		&models.BasecampTodoComment{},
+		&models.BasecampDocument{},
 		&models.BasecampTodo{},
 		&models.BasecampTodolistGroup{},
 		&models.BasecampTodolist{},

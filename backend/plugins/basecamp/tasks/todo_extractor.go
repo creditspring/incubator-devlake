@@ -98,7 +98,7 @@ func ExtractTodos(taskCtx plugin.SubTaskContext) errors.Error {
 
 			// Filter by todo age limit (based on updated_at)
 			if todoAgeLimitMonths > 0 && apiTodo.UpdatedAt != "" {
-				if updatedAt, parseErr := time.Parse(time.RFC3339, apiTodo.UpdatedAt); parseErr == nil {
+				if updatedAt, parseErr := time.Parse(time.RFC3339Nano, apiTodo.UpdatedAt); parseErr == nil {
 					if updatedAt.Before(cutoffDate) {
 						// Skip this todo - it's older than the cutoff
 						return nil, nil
@@ -128,17 +128,17 @@ func ExtractTodos(taskCtx plugin.SubTaskContext) errors.Error {
 
 			// Parse timestamps
 			if apiTodo.CreatedAt != "" {
-				if t, err := time.Parse(time.RFC3339, apiTodo.CreatedAt); err == nil {
+				if t, err := time.Parse(time.RFC3339Nano, apiTodo.CreatedAt); err == nil {
 					todo.CreatedAt = &t
 				}
 			}
 			if apiTodo.UpdatedAt != "" {
-				if t, err := time.Parse(time.RFC3339, apiTodo.UpdatedAt); err == nil {
+				if t, err := time.Parse(time.RFC3339Nano, apiTodo.UpdatedAt); err == nil {
 					todo.UpdatedAt = &t
 				}
 			}
 			if apiTodo.CompletedAt != "" {
-				if t, err := time.Parse(time.RFC3339, apiTodo.CompletedAt); err == nil {
+				if t, err := time.Parse(time.RFC3339Nano, apiTodo.CompletedAt); err == nil {
 					todo.CompletedAt = &t
 				}
 			}

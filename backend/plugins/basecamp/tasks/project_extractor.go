@@ -78,7 +78,7 @@ func ExtractProjects(taskCtx plugin.SubTaskContext) errors.Error {
 
 			// Parse created_at timestamp
 			if apiProject.CreatedAt != "" {
-				if t, err := time.Parse(time.RFC3339, apiProject.CreatedAt); err == nil {
+				if t, err := time.Parse(time.RFC3339Nano, apiProject.CreatedAt); err == nil {
 					project.CreatedAt = &t
 				}
 			}

@@ -18,31 +18,32 @@ limitations under the License.
 package migrationscripts
 
 import (
-	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/helpers/migrationhelper"
 )
 
-// All return all the migration scripts
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables),
-		new(addOAuth2Fields),
-		new(addAccountScope),
-		new(addProjectCreatedAt),
-		new(addPrReferences),
-		new(addTodolistGroups),
-		new(addPermanentProjectIds),
-		new(addScopeConfigFields),
-		new(addTodosetIds),
-		new(addProjectAgeLimit),
-		new(addTodoAgeLimit),
-		new(removeTodosetId),
-		new(addTodoComments),
-		new(enlargeCommentContent),
-		new(addTodolistGroupTimestamps),
-		new(addTodoEvents),
-		new(redesignPrReferences),
-		new(fixTokenExpiresAt),
-		new(addDocuments),
-		new(addDocumentVaultUrls),
-	}
+type basecampScopeConfig20260148 struct {
+	DocumentVaultUrls string `gorm:"type:text"`
+}
+
+func (basecampScopeConfig20260148) TableName() string {
+	return "_tool_basecamp_scope_configs"
+}
+
+type addDocumentVaultUrls struct{}
+
+func (*addDocumentVaultUrls) Up(basicRes context.BasicRes) errors.Error {
+	return migrationhelper.AutoMigrateTables(
+		basicRes,
+		&basecampScopeConfig20260148{},
+	)
+}
+
+func (*addDocumentVaultUrls) Version() uint64 {
+	return 20260148000001
+}
+
+func (*addDocumentVaultUrls) Name() string {
+	return "add document_vault_urls to basecamp_scope_configs"
 }

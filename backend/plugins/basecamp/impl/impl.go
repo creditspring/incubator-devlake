@@ -61,6 +61,7 @@ func (p Basecamp) GetTablesInfo() []dal.Tabler {
 		&models.BasecampTodo{},
 		&models.BasecampTodoComment{},
 		&models.BasecampTodoEvent{},
+		&models.BasecampDocument{},
 		&models.PrReference{},
 		&models.BasecampScopeConfig{},
 	}
@@ -89,7 +90,9 @@ func (p Basecamp) SubTaskMetas() []plugin.SubTaskMeta {
 		tasks.ExtractCommentsMeta,      // Parse comments
 		tasks.CollectEventsMeta,        // GET events for each todo
 		tasks.ExtractEventsMeta,        // Parse events
-		tasks.UpdateTodoCompletionMeta, // Update CompletedAt from events
+		tasks.UpdateTodoCompletionMeta,  // Update CompletedAt from events
+		tasks.CollectDocumentsMeta,     // GET documents from configured vaults
+		tasks.ExtractDocumentsMeta,     // Parse documents
 		tasks.ConvertProjectsMeta,      // projects → domain boards
 		tasks.ConvertTodosMeta,         // todos → domain issues
 		tasks.ConvertCommentsMeta,      // comments → domain issue comments

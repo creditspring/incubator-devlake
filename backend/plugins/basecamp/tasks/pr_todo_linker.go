@@ -72,7 +72,7 @@ func parseTime(s string) *time.Time {
 	if s == "" {
 		return nil
 	}
-	t, err := time.Parse(time.RFC3339, s)
+	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
 		return nil
 	}
