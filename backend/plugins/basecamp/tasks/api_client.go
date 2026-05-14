@@ -21,11 +21,29 @@ import (
 	"net/http"
 
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/basecamp/models"
 	"github.com/apache/incubator-devlake/plugins/basecamp/token"
 )
+
+// basecampResponseHook is registered on every Basecamp async client.
+// 404 — resource deleted since last sync; skip silently.
+// 401 — retrying won't help (bad token); skip and log so the rest of the task continues.
+func basecampResponseHook(logger log.Logger) plugin.ApiClientAfterResponse {
+	return func(res *http.Response) errors.Error {
+		switch res.StatusCode {
+		case http.StatusNotFound:
+			logger.Warn(nil, "Basecamp resource not found (404), skipping: %s", res.Request.URL)
+			return api.ErrIgnoreAndContinue
+		case http.StatusUnauthorized:
+			logger.Warn(nil, "Basecamp unauthorized (401), skipping: %s", res.Request.URL)
+			return api.ErrIgnoreAndContinue
+		}
+		return nil
+	}
+}
 
 // CreateApiClient creates a new API Client for Basecamp
 func CreateApiClient(taskCtx plugin.TaskContext, connection *models.BasecampConnection) (*api.ApiAsyncClient, errors.Error) {
@@ -54,6 +72,8 @@ func CreateApiClient(taskCtx plugin.TaskContext, connection *models.BasecampConn
 	if err != nil {
 		return nil, err
 	}
+
+	asyncApiClient.SetAfterFunction(basecampResponseHook(taskCtx.GetLogger()))
 
 	return asyncApiClient, nil
 }
