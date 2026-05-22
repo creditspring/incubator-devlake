@@ -110,7 +110,36 @@ export const BasecampTransformation = ({ entities, transformation, setTransforma
             </>
           ),
         },
-      ].filter((it) => entities.includes(it.key))}
+        {
+          key: 'DOCUMENTS',
+          label: 'Documents',
+          style: panelStyle,
+          children: (
+            <>
+              <h3 style={{ marginBottom: 16 }}>Document Vault URLs</h3>
+              <p style={{ marginBottom: 16 }}>
+                Enter one Basecamp vault URL per line to enable document syncing from those vaults. Leave empty to skip document collection.
+              </p>
+              <Input.TextArea
+                placeholder={
+                  'https://3.basecamp.com/{account}/buckets/{project_id}/vaults/{vault_id}\nhttps://3.basecamp.com/{account}/buckets/{project_id}/vaults/{vault_id}'
+                }
+                value={transformation.documentVaultUrls ?? ''}
+                onChange={(e) =>
+                  setTransformation({
+                    ...transformation,
+                    documentVaultUrls: e.target.value,
+                  })
+                }
+                rows={4}
+              />
+              <p style={{ marginTop: 8, color: token.colorTextSecondary, fontSize: 12 }}>
+                Find vault URLs in Basecamp: open a project, click Docs &amp; Files, then copy the URL from your browser.
+              </p>
+            </>
+          ),
+        },
+      ].filter((it) => it.key === 'DOCUMENTS' || entities.includes(it.key))}
     />
   );
 };

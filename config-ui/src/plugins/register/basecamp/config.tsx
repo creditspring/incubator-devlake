@@ -101,6 +101,7 @@ export const BasecampConfig: IPluginConfig = {
       projectAgeLimitMonths: 18,
       todoAgeLimitMonths: 0,
       permanentProjectIds: '',
+      documentVaultUrls: '',
     },
   },
 };
