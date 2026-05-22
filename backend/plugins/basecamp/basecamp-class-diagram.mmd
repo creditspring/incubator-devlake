@@ -62,6 +62,7 @@ classDiagram
         +PermanentProjectIds string
         +ProjectAgeLimitMonths int
         +TodoAgeLimitMonths int
+        +DocumentVaultUrls string
         +TableName() string
         +SetConnectionId(c, connectionId)
     }
@@ -139,6 +140,20 @@ classDiagram
         +CreatorName string
         +CreatedAt *time.Time
         +Details string
+        +TableName() string
+    }
+
+    class BasecampDocument {
+        +ConnectionId uint64
+        +DocumentId string
+        +ProjectId string
+        +VaultId string
+        +Title string
+        +CreatorId string
+        +CreatorName string
+        +CreatorEmail string
+        +CreatedAt *time.Time
+        +UpdatedAt *time.Time
         +TableName() string
     }
 
@@ -227,6 +242,17 @@ classDiagram
         +Recording RecordingRef
     }
 
+    class BasecampApiDocument {
+        <<api response>>
+        +ID int64
+        +Title string
+        +CreatedAt string
+        +UpdatedAt string
+        +Creator CreatorRef
+        +Bucket BucketRef
+        +Parent ParentRef
+    }
+
     %% ===== TOKEN MANAGEMENT =====
     class TokenProvider {
         -conn *BasecampConnection
@@ -270,6 +296,10 @@ classDiagram
         +ProjectId string
     }
 
+    class VaultInput {
+        +VaultId string
+    }
+
     %% ===== SUBTASKS =====
     class CleanupDataMeta {
         <<SubTaskMeta>>
@@ -277,6 +307,7 @@ classDiagram
         +EntryPoint: CleanupData
         +EnabledByDefault: true
         Note: Deletes existing data before sync
+        Note: Does NOT delete PrReferences
     }
 
     class CollectProjectsMeta {
@@ -375,6 +406,22 @@ classDiagram
         Note: Updates CompletedAt from events
     }
 
+    class CollectDocumentsMeta {
+        <<SubTaskMeta>>
+        +Name: CollectDocuments
+        +EntryPoint: CollectDocuments
+        +EnabledByDefault: false
+        Note: Requires DocumentVaultUrls in ScopeConfig
+        Note: Paginated; uses Link header for next page
+    }
+
+    class ExtractDocumentsMeta {
+        <<SubTaskMeta>>
+        +Name: ExtractDocuments
+        +EntryPoint: ExtractDocuments
+        +EnabledByDefault: false
+    }
+
     class ConvertProjectsMeta {
         <<SubTaskMeta>>
         +Name: convert_projects
@@ -437,6 +484,7 @@ classDiagram
     BasecampTodolistGroup --|> `common.NoPKModel` : embeds
     BasecampTodoComment --|> `common.NoPKModel` : embeds
     BasecampTodoEvent --|> `common.NoPKModel` : embeds
+    BasecampDocument --|> `common.NoPKModel` : embeds
     PrReference --|> `common.NoPKModel` : embeds
 
     %% ===== MODEL RELATIONSHIPS =====
@@ -460,6 +508,7 @@ classDiagram
     CollectTodolistsMeta ..> BasecampScopeConfig : reads ProjectAgeLimitMonths
     CollectTodolistsMeta ..> BasecampScopeConfig : reads PermanentProjectIds
     ExtractTodosMeta ..> BasecampScopeConfig : reads TodoAgeLimitMonths
+    CollectDocumentsMeta ..> BasecampScopeConfig : reads DocumentVaultUrls
 
     %% ===== PLUGIN TO SUBTASKS =====
     Basecamp --> CleanupDataMeta : registers
@@ -476,6 +525,8 @@ classDiagram
     Basecamp --> CollectEventsMeta : registers
     Basecamp --> ExtractEventsMeta : registers
     Basecamp --> UpdateTodoCompletionMeta : registers
+    Basecamp --> CollectDocumentsMeta : registers
+    Basecamp --> ExtractDocumentsMeta : registers
     Basecamp --> ConvertProjectsMeta : registers
     Basecamp --> ConvertTodosMeta : registers
     Basecamp --> ConvertCommentsMeta : registers
@@ -495,7 +546,9 @@ classDiagram
     ExtractCommentsMeta ..> CollectEventsMeta : then
     CollectEventsMeta ..> ExtractEventsMeta : then
     ExtractEventsMeta ..> UpdateTodoCompletionMeta : then
-    UpdateTodoCompletionMeta ..> ConvertProjectsMeta : then
+    UpdateTodoCompletionMeta ..> CollectDocumentsMeta : then
+    CollectDocumentsMeta ..> ExtractDocumentsMeta : then
+    ExtractDocumentsMeta ..> ConvertProjectsMeta : then
     ConvertProjectsMeta ..> ConvertTodosMeta : then
     ConvertTodosMeta ..> ConvertCommentsMeta : then
     ConvertCommentsMeta ..> LinkPrToTodoMeta : then
@@ -514,6 +567,8 @@ classDiagram
     CollectEventsMeta ..> BasecampApiEvent : collects
     ExtractEventsMeta ..> BasecampTodoEvent : produces
     UpdateTodoCompletionMeta ..> BasecampTodo : updates CompletedAt
+    CollectDocumentsMeta ..> BasecampApiDocument : collects
+    ExtractDocumentsMeta ..> BasecampDocument : produces
     LinkPrToTodoMeta ..> PrReference : produces
 
     %% ===== ITERATOR USAGE =====
@@ -522,3 +577,4 @@ classDiagram
     CollectTodosMeta ..> TodolistInput : iterates
     CollectCommentsMeta ..> TodoInput : iterates
     CollectEventsMeta ..> TodoInput : iterates
+    CollectDocumentsMeta ..> VaultInput : iterates
