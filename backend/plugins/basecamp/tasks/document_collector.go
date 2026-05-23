@@ -22,12 +22,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 
+	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	"github.com/apache/incubator-devlake/plugins/basecamp/models"
 )
 
 const RAW_DOCUMENT_TABLE = "basecamp_documents"
@@ -37,53 +38,86 @@ var _ plugin.SubTaskEntryPoint = CollectDocuments
 var CollectDocumentsMeta = plugin.SubTaskMeta{
 	Name:             "CollectDocuments",
 	EntryPoint:       CollectDocuments,
-	EnabledByDefault: false,
-	Description:      "Collect documents from configured Basecamp vaults",
+	EnabledByDefault: true,
+	Description:      "Collect documents from all vaults in synced Basecamp projects",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }
 
-// vaultURLRegex matches Basecamp vault URLs:
-// https://3.basecamp.com/{account}/buckets/{project_id}/vaults/{vault_id}
-var vaultURLRegex = regexp.MustCompile(`https?://3\.basecamp\.com/(\d+)/buckets/(\d+)/vaults/(\d+)`)
-
 // VaultInput holds the vault ID needed to collect documents from one vault.
-// project_id is not needed in the URL — it comes back in the response via bucket.id.
 type VaultInput struct {
 	VaultId string
 }
 
-// parseVaultURLs parses newline-separated Basecamp vault URLs and returns VaultInputs.
-func parseVaultURLs(raw string) []*VaultInput {
+// buildVaultInputs converts a slice of projects into VaultInputs by splitting each project's VaultIds.
+func buildVaultInputs(projects []models.BasecampProject) []*VaultInput {
 	var inputs []*VaultInput
-	for _, line := range strings.Split(raw, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
+	for _, p := range projects {
+		for _, id := range strings.Split(p.VaultIds, ",") {
+			if vaultId := strings.TrimSpace(id); vaultId != "" {
+				inputs = append(inputs, &VaultInput{VaultId: vaultId})
+			}
 		}
-		m := vaultURLRegex.FindStringSubmatch(line)
-		if len(m) < 4 {
-			continue
-		}
-		inputs = append(inputs, &VaultInput{VaultId: m[3]})
 	}
 	return inputs
 }
 
 func CollectDocuments(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*BasecampTaskData)
+	db := taskCtx.GetDal()
 
-	if data.ScopeConfig == nil || data.ScopeConfig.DocumentVaultUrls == "" {
-		taskCtx.GetLogger().Info("No document vault URLs configured, skipping document collection")
-		return nil
+	// Apply the same project age + permanent-ID filter as CollectTodolists
+	ageLimitMonths := 0
+	if data.ScopeConfig != nil && data.ScopeConfig.ProjectAgeLimitMonths > 0 {
+		ageLimitMonths = data.ScopeConfig.ProjectAgeLimitMonths
 	}
 
-	vaults := parseVaultURLs(data.ScopeConfig.DocumentVaultUrls)
+	var permanentIds []string
+	if data.ScopeConfig != nil && data.ScopeConfig.PermanentProjectIds != "" {
+		for _, id := range strings.Split(data.ScopeConfig.PermanentProjectIds, ",") {
+			if trimmed := strings.TrimSpace(id); trimmed != "" {
+				permanentIds = append(permanentIds, trimmed)
+			}
+		}
+	}
+
+	var projects []models.BasecampProject
+	var err errors.Error
+
+	if ageLimitMonths == 0 {
+		taskCtx.GetLogger().Info("No project age limit configured, collecting documents from all projects")
+		err = db.All(&projects,
+			dal.From(&models.BasecampProject{}),
+			dal.Where("connection_id = ? AND vault_ids != ''", data.Options.ConnectionId),
+		)
+	} else {
+		cutoffDate := data.now().AddDate(0, -ageLimitMonths, 0)
+		taskCtx.GetLogger().Info("Project age limit: %d months (cutoff: %s)", ageLimitMonths, cutoffDate.Format("2006-01-02"))
+
+		if len(permanentIds) > 0 {
+			err = db.All(&projects,
+				dal.From(&models.BasecampProject{}),
+				dal.Where("connection_id = ? AND vault_ids != '' AND (created_at > ? OR project_id IN ?)",
+					data.Options.ConnectionId, cutoffDate, permanentIds),
+			)
+		} else {
+			err = db.All(&projects,
+				dal.From(&models.BasecampProject{}),
+				dal.Where("connection_id = ? AND vault_ids != '' AND created_at > ?",
+					data.Options.ConnectionId, cutoffDate),
+			)
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	vaults := buildVaultInputs(projects)
 	if len(vaults) == 0 {
-		taskCtx.GetLogger().Info("No valid vault URLs found in DocumentVaultUrls, skipping document collection")
+		taskCtx.GetLogger().Info("No vaults found in synced projects, skipping document collection")
 		return nil
 	}
 
-	taskCtx.GetLogger().Info("Collecting documents from %d vaults", len(vaults))
+	taskCtx.GetLogger().Info("Collecting documents from %d vaults across %d projects", len(vaults), len(projects))
 
 	iterator := api.NewQueueIterator()
 	for _, v := range vaults {

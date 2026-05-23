@@ -76,7 +76,7 @@ func ExtractTodos(taskCtx plugin.SubTaskContext) errors.Error {
 
 	var cutoffDate time.Time
 	if todoAgeLimitMonths > 0 {
-		cutoffDate = time.Now().AddDate(0, -todoAgeLimitMonths, 0)
+		cutoffDate = taskData.now().AddDate(0, -todoAgeLimitMonths, 0)
 		taskCtx.GetLogger().Info("Todo age limit: %d months (cutoff: %s)", todoAgeLimitMonths, cutoffDate.Format("2006-01-02"))
 	}
 

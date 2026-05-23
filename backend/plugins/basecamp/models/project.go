@@ -32,7 +32,9 @@ type BasecampProject struct {
 	Name string `json:"name" mapstructure:"name" gorm:"type:varchar(255)"`
 	// TodosetIds stores all todoset IDs as comma-separated values (projects can have multiple todosets)
 	TodosetIds string `json:"todosetIds" mapstructure:"todosetIds" gorm:"type:text"`
-	CreatedAt  *time.Time `json:"createdAt" mapstructure:"createdAt"`
+	// VaultIds stores all vault IDs as comma-separated values (the "Docs & Files" dock item per project)
+	VaultIds  string     `json:"vaultIds" mapstructure:"vaultIds" gorm:"type:text"`
+	CreatedAt *time.Time `json:"createdAt" mapstructure:"createdAt"`
 }
 
 func (BasecampProject) TableName() string {

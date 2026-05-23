@@ -19,6 +19,7 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/helpers/e2ehelper"
@@ -36,6 +37,10 @@ func TestTodoAgeFilterDataFlow(t *testing.T) {
 		TodoAgeLimitMonths: 1,
 	}
 
+	// Fix clock to 2026-02-01 so January 2026 todos are "recent" and
+	// the 2025-06 todo is reliably filtered out — test never expires.
+	fixedNow := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+
 	taskData := &tasks.BasecampTaskData{
 		Options: &tasks.BasecampOptions{
 			ConnectionId: 1,
@@ -43,6 +48,7 @@ func TestTodoAgeFilterDataFlow(t *testing.T) {
 		},
 		AccountId:   "4450519",
 		ScopeConfig: scopeConfig,
+		Now:         func() time.Time { return fixedNow },
 	}
 
 	// Import raw API response data with mix of old and recent todos

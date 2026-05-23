@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -82,7 +81,7 @@ func CollectTodolists(taskCtx plugin.SubTaskContext) errors.Error {
 			dal.Where("connection_id = ? AND todoset_ids != ''", data.Options.ConnectionId),
 		)
 	} else {
-		cutoffDate := time.Now().AddDate(0, -ageLimitMonths, 0)
+		cutoffDate := data.now().AddDate(0, -ageLimitMonths, 0)
 		taskCtx.GetLogger().Info("Project age limit: %d months (cutoff: %s)", ageLimitMonths, cutoffDate.Format("2006-01-02"))
 
 		if len(permanentIds) > 0 {

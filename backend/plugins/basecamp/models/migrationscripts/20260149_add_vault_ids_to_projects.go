@@ -18,32 +18,32 @@ limitations under the License.
 package migrationscripts
 
 import (
-	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/helpers/migrationhelper"
 )
 
-// All return all the migration scripts
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables),
-		new(addOAuth2Fields),
-		new(addAccountScope),
-		new(addProjectCreatedAt),
-		new(addPrReferences),
-		new(addTodolistGroups),
-		new(addPermanentProjectIds),
-		new(addScopeConfigFields),
-		new(addTodosetIds),
-		new(addProjectAgeLimit),
-		new(addTodoAgeLimit),
-		new(removeTodosetId),
-		new(addTodoComments),
-		new(enlargeCommentContent),
-		new(addTodolistGroupTimestamps),
-		new(addTodoEvents),
-		new(redesignPrReferences),
-		new(fixTokenExpiresAt),
-		new(addDocuments),
-		new(addDocumentVaultUrls),
-		new(addVaultIdsToProjects),
-	}
+type basecampProject20260149 struct {
+	VaultIds string `gorm:"type:text"`
+}
+
+func (basecampProject20260149) TableName() string {
+	return "_tool_basecamp_projects"
+}
+
+type addVaultIdsToProjects struct{}
+
+func (*addVaultIdsToProjects) Up(basicRes context.BasicRes) errors.Error {
+	return migrationhelper.AutoMigrateTables(
+		basicRes,
+		&basecampProject20260149{},
+	)
+}
+
+func (*addVaultIdsToProjects) Version() uint64 {
+	return 20260149000001
+}
+
+func (*addVaultIdsToProjects) Name() string {
+	return "add vault_ids to basecamp_projects for automatic document collection"
 }

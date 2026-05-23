@@ -20,53 +20,81 @@ package tasks
 import (
 	"testing"
 
+	"github.com/apache/incubator-devlake/plugins/basecamp/models"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParseVaultURLs(t *testing.T) {
+func TestBuildVaultInputs(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    string
+		projects []models.BasecampProject
 		expected []*VaultInput
 	}{
 		{
-			name:     "single URL",
-			input:    "https://3.basecamp.com/4450519/buckets/15909529/vaults/2663047427",
+			name: "single project single vault",
+			projects: []models.BasecampProject{
+				{VaultIds: "2663047427"},
+			},
 			expected: []*VaultInput{{VaultId: "2663047427"}},
 		},
 		{
-			name: "multiple URLs newline separated",
-			input: "https://3.basecamp.com/4450519/buckets/15909529/vaults/2663047427\nhttps://3.basecamp.com/4450519/buckets/99999999/vaults/11111111",
+			name: "single project multiple vaults",
+			projects: []models.BasecampProject{
+				{VaultIds: "111,222,333"},
+			},
 			expected: []*VaultInput{
-				{VaultId: "2663047427"},
-				{VaultId: "11111111"},
+				{VaultId: "111"},
+				{VaultId: "222"},
+				{VaultId: "333"},
 			},
 		},
 		{
-			name:     "empty string",
-			input:    "",
+			name: "multiple projects",
+			projects: []models.BasecampProject{
+				{VaultIds: "111"},
+				{VaultIds: "222"},
+			},
+			expected: []*VaultInput{
+				{VaultId: "111"},
+				{VaultId: "222"},
+			},
+		},
+		{
+			name: "project with empty VaultIds produces no inputs",
+			projects: []models.BasecampProject{
+				{VaultIds: ""},
+			},
 			expected: nil,
 		},
 		{
-			name:     "blank lines ignored",
-			input:    "\n\nhttps://3.basecamp.com/4450519/buckets/15909529/vaults/2663047427\n\n",
-			expected: []*VaultInput{{VaultId: "2663047427"}},
-		},
-		{
-			name:     "invalid URL skipped",
-			input:    "not-a-url\nhttps://3.basecamp.com/4450519/buckets/15909529/vaults/2663047427",
-			expected: []*VaultInput{{VaultId: "2663047427"}},
-		},
-		{
-			name:     "non-vault Basecamp URL skipped",
-			input:    "https://3.basecamp.com/4450519/buckets/15909529/todos/12345",
+			name:     "no projects",
+			projects: []models.BasecampProject{},
 			expected: nil,
+		},
+		{
+			name: "vault IDs with surrounding whitespace are trimmed",
+			projects: []models.BasecampProject{
+				{VaultIds: " 111 , 222 "},
+			},
+			expected: []*VaultInput{
+				{VaultId: "111"},
+				{VaultId: "222"},
+			},
+		},
+		{
+			name: "mixed: some projects have vaults, some do not",
+			projects: []models.BasecampProject{
+				{VaultIds: ""},
+				{VaultIds: "999"},
+				{VaultIds: ""},
+			},
+			expected: []*VaultInput{{VaultId: "999"}},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := parseVaultURLs(tt.input)
+			result := buildVaultInputs(tt.projects)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

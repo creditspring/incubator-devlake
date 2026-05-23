@@ -33,7 +33,7 @@ var _ plugin.SubTaskEntryPoint = ExtractDocuments
 var ExtractDocumentsMeta = plugin.SubTaskMeta{
 	Name:             "ExtractDocuments",
 	EntryPoint:       ExtractDocuments,
-	EnabledByDefault: false,
+	EnabledByDefault: true,
 	Description:      "Extract raw data into tool layer table _tool_basecamp_documents",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }

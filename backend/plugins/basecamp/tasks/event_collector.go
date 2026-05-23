@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -53,7 +52,7 @@ func CollectEvents(taskCtx plugin.SubTaskContext) errors.Error {
 		dal.Where("connection_id = ?", data.Options.ConnectionId),
 	}
 	if data.ScopeConfig != nil && data.ScopeConfig.TodoAgeLimitMonths > 0 {
-		cutoff := time.Now().AddDate(0, -data.ScopeConfig.TodoAgeLimitMonths, 0)
+		cutoff := data.now().AddDate(0, -data.ScopeConfig.TodoAgeLimitMonths, 0)
 		clauses = append(clauses, dal.Where("updated_at >= ?", cutoff))
 		taskCtx.GetLogger().Info("Event collection filtered by todo age limit: %d months (cutoff: %s)",
 			data.ScopeConfig.TodoAgeLimitMonths, cutoff.Format("2006-01-02"))

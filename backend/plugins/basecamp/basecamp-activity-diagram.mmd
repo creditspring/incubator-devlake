@@ -103,10 +103,10 @@ flowchart TD
     end
 
     subgraph Documents["Document Collection & Extraction"]
-        SCOPE --> |"Read DocumentVaultUrls"| VAULTCHECK{DocumentVaultUrls\nconfigured?}
+        PROJ --> |"Query projects\nwith vault_ids"| VAULTCHECK{Projects with\nVaultIds found?}
         VAULTCHECK --> |"No"| SKIPDOCS([Skip Documents])
-        VAULTCHECK --> |"Yes"| PARSEVAULTS[parseVaultURLs]
-        PARSEVAULTS --> |"One VaultInput per URL"| CDOC[CollectDocuments]
+        VAULTCHECK --> |"Yes"| BUILDVAULTS[buildVaultInputs\nSplit VaultIds per project]
+        BUILDVAULTS --> |"One VaultInput per vault"| CDOC[CollectDocuments]
         CDOC --> |"GET /{accountId}/vaults/{vaultId}/documents.json"| API7{Basecamp API}
         API7 --> |"Paginated JSON\nLink header for next page"| RAW7[(raw: basecamp_documents)]
         RAW7 --> EDOC[ExtractDocuments]
@@ -160,7 +160,7 @@ flowchart TD
     classDef config fill:#e0f2f1,stroke:#00695c,stroke-width:2px
     classDef cleanup fill:#ffebee,stroke:#c62828,stroke-width:2px
 
-    class CP,EP,CTL,ETL,CG,EG,CT,ET,CVTP,CVTT,CVTC,LINK,PREPARE,ITERATE,CC,EC,CEV,EEV,UTC,CDOC,EDOC,PARSEVAULTS task
+    class CP,EP,CTL,ETL,CG,EG,CT,ET,CVTP,CVTT,CVTC,LINK,PREPARE,ITERATE,CC,EC,CEV,EEV,UTC,CDOC,EDOC,BUILDVAULTS task
     class RAW1,RAW2,RAW3,RAW4,RAW5,RAW6,RAW7,PROJ,TDL,GRP,TODO,TODO2,COMMENT,EVENT,DOC,TASKDATA,OPTS,CLIENT storage
     class API1,API2,API3,API4A,API4B,API5,API6,API7 api
     class PROJFILTER,AGECHECK,PERMCHECK,DATECHECK,TODOAGECHECK,UPDATEDCHECK,REGEX,MATCH,FINDCOMP,VAULTCHECK decision

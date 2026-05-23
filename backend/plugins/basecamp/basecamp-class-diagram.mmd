@@ -62,7 +62,6 @@ classDiagram
         +PermanentProjectIds string
         +ProjectAgeLimitMonths int
         +TodoAgeLimitMonths int
-        +DocumentVaultUrls string
         +TableName() string
         +SetConnectionId(c, connectionId)
     }
@@ -73,6 +72,7 @@ classDiagram
         +ProjectId string
         +Name string
         +TodosetIds string
+        +VaultIds string
         +CreatedAt *time.Time
         +TableName() string
     }
@@ -410,8 +410,8 @@ classDiagram
         <<SubTaskMeta>>
         +Name: CollectDocuments
         +EntryPoint: CollectDocuments
-        +EnabledByDefault: false
-        Note: Requires DocumentVaultUrls in ScopeConfig
+        +EnabledByDefault: true
+        Note: Queries projects for VaultIds automatically
         Note: Paginated; uses Link header for next page
     }
 
@@ -419,7 +419,7 @@ classDiagram
         <<SubTaskMeta>>
         +Name: ExtractDocuments
         +EntryPoint: ExtractDocuments
-        +EnabledByDefault: false
+        +EnabledByDefault: true
     }
 
     class ConvertProjectsMeta {
@@ -508,7 +508,7 @@ classDiagram
     CollectTodolistsMeta ..> BasecampScopeConfig : reads ProjectAgeLimitMonths
     CollectTodolistsMeta ..> BasecampScopeConfig : reads PermanentProjectIds
     ExtractTodosMeta ..> BasecampScopeConfig : reads TodoAgeLimitMonths
-    CollectDocumentsMeta ..> BasecampScopeConfig : reads DocumentVaultUrls
+    CollectDocumentsMeta ..> BasecampProject : reads VaultIds
 
     %% ===== PLUGIN TO SUBTASKS =====
     Basecamp --> CleanupDataMeta : registers
