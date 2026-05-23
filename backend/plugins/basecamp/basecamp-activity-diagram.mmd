@@ -102,14 +102,24 @@ flowchart TD
         UPDATECOMP --> TODO2[(BasecampTodo updated)]
     end
 
-    subgraph Documents["Document Collection & Extraction"]
+    subgraph Vaults["Sub-Vault Collection & Extraction"]
         PROJ --> |"Query projects\nwith vault_ids"| VAULTCHECK{Projects with\nVaultIds found?}
-        VAULTCHECK --> |"No"| SKIPDOCS([Skip Documents])
-        VAULTCHECK --> |"Yes"| BUILDVAULTS[buildVaultInputs\nSplit VaultIds per project]
-        BUILDVAULTS --> |"One VaultInput per vault"| CDOC[CollectDocuments]
-        CDOC --> |"GET /{accountId}/vaults/{vaultId}/documents.json"| API7{Basecamp API}
-        API7 --> |"Paginated JSON\nLink header for next page"| RAW7[(raw: basecamp_documents)]
-        RAW7 --> EDOC[ExtractDocuments]
+        VAULTCHECK --> |"No"| SKIPVAULTS([Skip Vaults])
+        VAULTCHECK --> |"Yes"| BUILDROOTS[buildVaultInputs\nSplit VaultIds per project]
+        BUILDROOTS --> |"One VaultInput per root vault"| CV[CollectVaults]
+        CV --> |"GET /{accountId}/vaults/{vaultId}/vaults.json"| API7{Basecamp API}
+        API7 --> |"Sub-vault JSON"| RAW7[(raw: basecamp_vaults)]
+        RAW7 --> EV[ExtractVaults]
+        EV --> |"Parse JSON"| VAULT[(BasecampVault)]
+        CV --> |"Recursive push:\nnewly found sub-vaults\nre-queued to iterator"| CV
+    end
+
+    subgraph Documents["Document Collection & Extraction"]
+        VAULT --> |"Query all sub-vaults"| CDOC[CollectDocuments]
+        BUILDROOTS --> |"Root vault inputs"| CDOC
+        CDOC --> |"GET /{accountId}/vaults/{vaultId}/documents.json"| API8{Basecamp API}
+        API8 --> |"Paginated JSON\nLink header for next page"| RAW8[(raw: basecamp_documents)]
+        RAW8 --> EDOC[ExtractDocuments]
         EDOC --> |"Parse JSON"| DOC[(BasecampDocument)]
     end
 
@@ -137,8 +147,8 @@ flowchart TD
 
     %% Cross-subgraph sequencing
     TODO2 --> VAULTCHECK
+    SKIPVAULTS --> CDOC
     DOC --> CVTP
-    SKIPDOCS --> CVTP
 
     BOARD --> DONE
     ICOMMENT --> DONE
@@ -160,9 +170,9 @@ flowchart TD
     classDef config fill:#e0f2f1,stroke:#00695c,stroke-width:2px
     classDef cleanup fill:#ffebee,stroke:#c62828,stroke-width:2px
 
-    class CP,EP,CTL,ETL,CG,EG,CT,ET,CVTP,CVTT,CVTC,LINK,PREPARE,ITERATE,CC,EC,CEV,EEV,UTC,CDOC,EDOC,BUILDVAULTS task
-    class RAW1,RAW2,RAW3,RAW4,RAW5,RAW6,RAW7,PROJ,TDL,GRP,TODO,TODO2,COMMENT,EVENT,DOC,TASKDATA,OPTS,CLIENT storage
-    class API1,API2,API3,API4A,API4B,API5,API6,API7 api
+    class CP,EP,CTL,ETL,CG,EG,CT,ET,CVTP,CVTT,CVTC,LINK,PREPARE,ITERATE,CC,EC,CEV,EEV,UTC,CV,EV,CDOC,EDOC,BUILDROOTS task
+    class RAW1,RAW2,RAW3,RAW4,RAW5,RAW6,RAW7,RAW8,PROJ,TDL,GRP,TODO,TODO2,COMMENT,EVENT,VAULT,DOC,TASKDATA,OPTS,CLIENT storage
+    class API1,API2,API3,API4A,API4B,API5,API6,API7,API8 api
     class PROJFILTER,AGECHECK,PERMCHECK,DATECHECK,TODOAGECHECK,UPDATEDCHECK,REGEX,MATCH,FINDCOMP,VAULTCHECK decision
     class BOARD,ISSUE,BISSUE,PRREF,PRISSUE,PRS,ICOMMENT domain
     class SCOPE,CUTOFF,TODOCUTOFF config

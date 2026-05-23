@@ -15,36 +15,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migrationscripts
+package models
 
 import (
-	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/core/models/common"
 )
 
-// All return all the migration scripts
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables),
-		new(addOAuth2Fields),
-		new(addAccountScope),
-		new(addProjectCreatedAt),
-		new(addPrReferences),
-		new(addTodolistGroups),
-		new(addPermanentProjectIds),
-		new(addScopeConfigFields),
-		new(addTodosetIds),
-		new(addProjectAgeLimit),
-		new(addTodoAgeLimit),
-		new(removeTodosetId),
-		new(addTodoComments),
-		new(enlargeCommentContent),
-		new(addTodolistGroupTimestamps),
-		new(addTodoEvents),
-		new(redesignPrReferences),
-		new(fixTokenExpiresAt),
-		new(addDocuments),
-		new(addDocumentVaultUrls),
-		new(addVaultIdsToProjects),
-		new(addVaults),
-	}
+type BasecampVault struct {
+	common.NoPKModel `json:"-" mapstructure:"-"`
+	ConnectionId     uint64 `json:"connectionId" gorm:"primaryKey"`
+	VaultId          string `json:"vaultId" gorm:"primaryKey;type:varchar(255)"`
+	ParentVaultId    string `json:"parentVaultId" gorm:"type:varchar(255);index"`
+	Title            string `json:"title" gorm:"type:varchar(255)"`
+}
+
+func (BasecampVault) TableName() string {
+	return "_tool_basecamp_vaults"
 }

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/apache/incubator-devlake/core/dal"
@@ -31,41 +32,22 @@ import (
 	"github.com/apache/incubator-devlake/plugins/basecamp/models"
 )
 
-const RAW_DOCUMENT_TABLE = "basecamp_documents"
+const RAW_VAULT_TABLE = "basecamp_vaults"
 
-var _ plugin.SubTaskEntryPoint = CollectDocuments
+var _ plugin.SubTaskEntryPoint = CollectVaults
 
-var CollectDocumentsMeta = plugin.SubTaskMeta{
-	Name:             "CollectDocuments",
-	EntryPoint:       CollectDocuments,
+var CollectVaultsMeta = plugin.SubTaskMeta{
+	Name:             "CollectVaults",
+	EntryPoint:       CollectVaults,
 	EnabledByDefault: true,
-	Description:      "Collect documents from all vaults in synced Basecamp projects",
+	Description:      "Recursively collect sub-vaults (folders) from all root vaults in synced Basecamp projects",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }
 
-// VaultInput holds the vault ID needed to collect documents from one vault.
-type VaultInput struct {
-	VaultId string
-}
-
-// buildVaultInputs converts a slice of projects into VaultInputs by splitting each project's VaultIds.
-func buildVaultInputs(projects []models.BasecampProject) []*VaultInput {
-	var inputs []*VaultInput
-	for _, p := range projects {
-		for _, id := range strings.Split(p.VaultIds, ",") {
-			if vaultId := strings.TrimSpace(id); vaultId != "" {
-				inputs = append(inputs, &VaultInput{VaultId: vaultId})
-			}
-		}
-	}
-	return inputs
-}
-
-func CollectDocuments(taskCtx plugin.SubTaskContext) errors.Error {
+func CollectVaults(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*BasecampTaskData)
 	db := taskCtx.GetDal()
 
-	// Apply the same project age + permanent-ID filter as CollectTodolists
 	ageLimitMonths := 0
 	if data.ScopeConfig != nil && data.ScopeConfig.ProjectAgeLimitMonths > 0 {
 		ageLimitMonths = data.ScopeConfig.ProjectAgeLimitMonths
@@ -84,15 +66,12 @@ func CollectDocuments(taskCtx plugin.SubTaskContext) errors.Error {
 	var err errors.Error
 
 	if ageLimitMonths == 0 {
-		taskCtx.GetLogger().Info("No project age limit configured, collecting documents from all projects")
 		err = db.All(&projects,
 			dal.From(&models.BasecampProject{}),
 			dal.Where("connection_id = ? AND vault_ids != ''", data.Options.ConnectionId),
 		)
 	} else {
 		cutoffDate := data.now().AddDate(0, -ageLimitMonths, 0)
-		taskCtx.GetLogger().Info("Project age limit: %d months (cutoff: %s)", ageLimitMonths, cutoffDate.Format("2006-01-02"))
-
 		if len(permanentIds) > 0 {
 			err = db.All(&projects,
 				dal.From(&models.BasecampProject{}),
@@ -112,30 +91,18 @@ func CollectDocuments(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	rootVaults := buildVaultInputs(projects)
-
-	// Also include sub-vaults discovered by CollectVaults
-	var subVaults []models.BasecampVault
-	if err := db.All(&subVaults,
-		dal.From(&models.BasecampVault{}),
-		dal.Where("connection_id = ?", data.Options.ConnectionId),
-	); err != nil {
-		return err
-	}
-
-	totalVaults := len(rootVaults) + len(subVaults)
-	if totalVaults == 0 {
-		taskCtx.GetLogger().Info("No vaults found in synced projects, skipping document collection")
+	if len(rootVaults) == 0 {
+		taskCtx.GetLogger().Info("No root vaults found, skipping sub-vault collection")
 		return nil
 	}
 
-	taskCtx.GetLogger().Info("Collecting documents from %d root vaults and %d sub-vaults", len(rootVaults), len(subVaults))
+	taskCtx.GetLogger().Info("Collecting sub-vaults from %d root vaults across %d projects", len(rootVaults), len(projects))
 
+	// iterator is captured by the ResponseParser closure to enable recursive discovery:
+	// when sub-vaults are found, their IDs are pushed back so they are also queried.
 	iterator := api.NewQueueIterator()
 	for _, v := range rootVaults {
 		iterator.Push(v)
-	}
-	for _, v := range subVaults {
-		iterator.Push(&VaultInput{VaultId: v.VaultId})
 	}
 
 	collector, err := api.NewApiCollector(api.ApiCollectorArgs{
@@ -145,12 +112,12 @@ func CollectDocuments(taskCtx plugin.SubTaskContext) errors.Error {
 				ConnectionId: data.Options.ConnectionId,
 				AccountId:    data.AccountId,
 			},
-			Table: RAW_DOCUMENT_TABLE,
+			Table: RAW_VAULT_TABLE,
 		},
 		ApiClient: data.ApiClient,
 		Input:     iterator,
 		PageSize:  15,
-		UrlTemplate: fmt.Sprintf("%s/vaults/{{ .Input.VaultId }}/documents.json",
+		UrlTemplate: fmt.Sprintf("%s/vaults/{{ .Input.VaultId }}/vaults.json",
 			data.AccountId),
 		Query: func(reqData *api.RequestData) (url.Values, errors.Error) {
 			query := url.Values{}
@@ -169,15 +136,23 @@ func CollectDocuments(taskCtx plugin.SubTaskContext) errors.Error {
 			return prevReqData.Pager.Page + 1, nil
 		},
 		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
-			var documents []json.RawMessage
-			err := api.UnmarshalResponse(res, &documents)
-			if err != nil {
+			var rawVaults []json.RawMessage
+			if err := api.UnmarshalResponse(res, &rawVaults); err != nil {
 				return nil, err
 			}
-			return documents, nil
+			// Push each discovered sub-vault ID back into the iterator so its
+			// own sub-vaults are also collected (BFS recursive discovery).
+			for _, raw := range rawVaults {
+				var v struct {
+					ID int64 `json:"id"`
+				}
+				if jsonErr := json.Unmarshal(raw, &v); jsonErr == nil && v.ID > 0 {
+					iterator.Push(&VaultInput{VaultId: strconv.FormatInt(v.ID, 10)})
+				}
+			}
+			return rawVaults, nil
 		},
 	})
-
 	if err != nil {
 		return err
 	}
