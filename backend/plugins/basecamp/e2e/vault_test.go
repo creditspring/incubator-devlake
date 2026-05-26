@@ -19,7 +19,6 @@ package e2e
 
 import (
 	"testing"
-	"time"
 
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/helpers/e2ehelper"
@@ -28,42 +27,29 @@ import (
 	"github.com/apache/incubator-devlake/plugins/basecamp/tasks"
 )
 
-func TestTodoAgeFilterDataFlow(t *testing.T) {
+func TestVaultDataFlow(t *testing.T) {
 	var plugin impl.Basecamp
 	dataflowTester := e2ehelper.NewDataFlowTester(t, "basecamp", plugin)
-
-	// Create scope config with 1 month age limit
-	scopeConfig := &models.BasecampScopeConfig{
-		TodoAgeLimitMonths: 1,
-	}
-
-	// Fix clock to 2026-02-01 so January 2026 todos are "recent" and
-	// the 2025-06 todo is reliably filtered out — test never expires.
-	fixedNow := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
 
 	taskData := &tasks.BasecampTaskData{
 		Options: &tasks.BasecampOptions{
 			ConnectionId: 1,
 			AccountId:    "4450519",
 		},
-		AccountId:   "4450519",
-		ScopeConfig: scopeConfig,
-		Now:         func() time.Time { return fixedNow },
+		AccountId: "4450519",
 	}
 
-	// Import raw API response data with mix of old and recent todos
 	dataflowTester.ImportCsvIntoRawTable(
-		"./raw_tables/_raw_basecamp_todos_age_filter.csv",
-		"_raw_basecamp_todos",
+		"./raw_tables/_raw_basecamp_vaults.csv",
+		"_raw_basecamp_vaults",
 	)
 
-	// Test extraction - old todos should be filtered out
-	dataflowTester.FlushTabler(&models.BasecampTodo{})
-	dataflowTester.Subtask(tasks.ExtractTodosMeta, taskData)
+	dataflowTester.FlushTabler(&models.BasecampVault{})
+	dataflowTester.Subtask(tasks.ExtractVaultsMeta, taskData)
 	dataflowTester.VerifyTableWithOptions(
-		models.BasecampTodo{},
+		models.BasecampVault{},
 		e2ehelper.TableOptions{
-			CSVRelPath:  "./snapshot_tables/_tool_basecamp_todos_age_filter.csv",
+			CSVRelPath:  "./snapshot_tables/_tool_basecamp_vaults.csv",
 			IgnoreTypes: []interface{}{common.NoPKModel{}},
 		},
 	)

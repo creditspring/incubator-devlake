@@ -52,7 +52,7 @@ func TestGroupDataFlow(t *testing.T) {
 		models.BasecampTodolistGroup{},
 		e2ehelper.TableOptions{
 			CSVRelPath:  "./snapshot_tables/_tool_basecamp_todolist_groups.csv",
-			IgnoreTypes: []interface{}{common.RawDataOrigin{}},
+			IgnoreTypes: []interface{}{common.NoPKModel{}},
 		},
 	)
 }

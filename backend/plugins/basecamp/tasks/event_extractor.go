@@ -101,7 +101,7 @@ func ExtractEvents(taskCtx plugin.SubTaskContext) errors.Error {
 
 			// Parse timestamp
 			if apiEvent.CreatedAt != "" {
-				if t, err := time.Parse(time.RFC3339, apiEvent.CreatedAt); err == nil {
+				if t, err := time.Parse(time.RFC3339Nano, apiEvent.CreatedAt); err == nil {
 					event.CreatedAt = &t
 				}
 			}

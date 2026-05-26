@@ -28,20 +28,20 @@ import (
 	"github.com/apache/incubator-devlake/plugins/basecamp/models"
 )
 
-var _ plugin.SubTaskEntryPoint = ExtractComments
+var _ plugin.SubTaskEntryPoint = ExtractDocuments
 
-var ExtractCommentsMeta = plugin.SubTaskMeta{
-	Name:             "ExtractComments",
-	EntryPoint:       ExtractComments,
+var ExtractDocumentsMeta = plugin.SubTaskMeta{
+	Name:             "ExtractDocuments",
+	EntryPoint:       ExtractDocuments,
 	EnabledByDefault: true,
-	Description:      "Extract raw data into tool layer table _tool_basecamp_todo_comments",
+	Description:      "Extract raw data into tool layer table _tool_basecamp_documents",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }
 
-// BasecampApiComment represents the API response for a comment
-type BasecampApiComment struct {
+// BasecampApiDocument represents the Basecamp API response for a document
+type BasecampApiDocument struct {
 	ID        int64  `json:"id"`
-	Content   string `json:"content"`
+	Title     string `json:"title"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 	Creator   struct {
@@ -49,15 +49,15 @@ type BasecampApiComment struct {
 		Name         string `json:"name"`
 		EmailAddress string `json:"email_address"`
 	} `json:"creator"`
-	Parent struct {
-		ID int64 `json:"id"`
-	} `json:"parent"`
 	Bucket struct {
 		ID int64 `json:"id"`
 	} `json:"bucket"`
+	Parent struct {
+		ID int64 `json:"id"`
+	} `json:"parent"`
 }
 
-func ExtractComments(taskCtx plugin.SubTaskContext) errors.Error {
+func ExtractDocuments(taskCtx plugin.SubTaskContext) errors.Error {
 	taskData := taskCtx.GetData().(*BasecampTaskData)
 
 	extractor, err := api.NewApiExtractor(api.ApiExtractorArgs{
@@ -67,39 +67,38 @@ func ExtractComments(taskCtx plugin.SubTaskContext) errors.Error {
 				ConnectionId: taskData.Options.ConnectionId,
 				AccountId:    taskData.AccountId,
 			},
-			Table: RAW_COMMENT_TABLE,
+			Table: RAW_DOCUMENT_TABLE,
 		},
 		Extract: func(resData *api.RawData) ([]interface{}, errors.Error) {
-			apiComment := &BasecampApiComment{}
-			err := errors.Convert(json.Unmarshal(resData.Data, apiComment))
+			apiDoc := &BasecampApiDocument{}
+			err := errors.Convert(json.Unmarshal(resData.Data, apiDoc))
 			if err != nil {
 				return nil, err
 			}
 
-			comment := &models.BasecampTodoComment{
+			doc := &models.BasecampDocument{
 				ConnectionId: taskData.Options.ConnectionId,
-				CommentId:    strconv.FormatInt(apiComment.ID, 10),
-				TodoId:       strconv.FormatInt(apiComment.Parent.ID, 10),
-				ProjectId:    strconv.FormatInt(apiComment.Bucket.ID, 10),
-				Content:      apiComment.Content,
-				CreatorId:    strconv.FormatInt(apiComment.Creator.ID, 10),
-				CreatorName:  apiComment.Creator.Name,
-				CreatorEmail: apiComment.Creator.EmailAddress,
+				DocumentId:   strconv.FormatInt(apiDoc.ID, 10),
+				ProjectId:    strconv.FormatInt(apiDoc.Bucket.ID, 10),
+				VaultId:      strconv.FormatInt(apiDoc.Parent.ID, 10),
+				Title:        apiDoc.Title,
+				CreatorId:    strconv.FormatInt(apiDoc.Creator.ID, 10),
+				CreatorName:  apiDoc.Creator.Name,
+				CreatorEmail: apiDoc.Creator.EmailAddress,
 			}
 
-			// Parse timestamps
-			if apiComment.CreatedAt != "" {
-				if t, err := time.Parse(time.RFC3339Nano, apiComment.CreatedAt); err == nil {
-					comment.CreatedAt = &t
+			if apiDoc.CreatedAt != "" {
+				if t, err := time.Parse(time.RFC3339Nano, apiDoc.CreatedAt); err == nil {
+					doc.CreatedAt = &t
 				}
 			}
-			if apiComment.UpdatedAt != "" {
-				if t, err := time.Parse(time.RFC3339Nano, apiComment.UpdatedAt); err == nil {
-					comment.UpdatedAt = &t
+			if apiDoc.UpdatedAt != "" {
+				if t, err := time.Parse(time.RFC3339Nano, apiDoc.UpdatedAt); err == nil {
+					doc.UpdatedAt = &t
 				}
 			}
 
-			return []interface{}{comment}, nil
+			return []interface{}{doc}, nil
 		},
 	})
 	if err != nil {

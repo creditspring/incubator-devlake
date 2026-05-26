@@ -10,16 +10,16 @@ flowchart TD
     subgraph Cleanup["Data Cleanup"]
         TASKDATA --> CLEAN[CleanupData]
         CLEAN --> |"Delete existing data"| DEL1[Delete Comments]
-        DEL1 --> DEL2[Delete Events]
+        DEL1 --> DEL2[Delete Documents]
         DEL2 --> DEL3[Delete Todos]
         DEL3 --> DEL4[Delete Groups]
         DEL4 --> DEL5[Delete Todolists]
         DEL5 --> DEL6[Delete Projects]
-        DEL6 --> DEL7[Delete PR References]
+        Note1["PrReferences NOT deleted\n(managed by LinkPrToTodo post-source task)"]
     end
 
     subgraph Projects["Project Collection & Extraction"]
-        DEL7 --> CP[CollectProjects]
+        DEL6 --> CP[CollectProjects]
         CP --> |"GET /projects.json"| API1{Basecamp API}
         API1 --> |"Raw JSON"| RAW1[(raw: basecamp_projects)]
         RAW1 --> EP[ExtractProjects]
@@ -102,6 +102,27 @@ flowchart TD
         UPDATECOMP --> TODO2[(BasecampTodo updated)]
     end
 
+    subgraph Vaults["Sub-Vault Collection & Extraction"]
+        PROJ --> |"Query projects\nwith vault_ids"| VAULTCHECK{Projects with\nVaultIds found?}
+        VAULTCHECK --> |"No"| SKIPVAULTS([Skip Vaults])
+        VAULTCHECK --> |"Yes"| BUILDROOTS[buildVaultInputs\nSplit VaultIds per project]
+        BUILDROOTS --> |"One VaultInput per root vault"| CV[CollectVaults]
+        CV --> |"GET /{accountId}/vaults/{vaultId}/vaults.json"| API7{Basecamp API}
+        API7 --> |"Sub-vault JSON"| RAW7[(raw: basecamp_vaults)]
+        RAW7 --> EV[ExtractVaults]
+        EV --> |"Parse JSON"| VAULT[(BasecampVault)]
+        CV --> |"Recursive push:\nnewly found sub-vaults\nre-queued to iterator"| CV
+    end
+
+    subgraph Documents["Document Collection & Extraction"]
+        VAULT --> |"Query all sub-vaults"| CDOC[CollectDocuments]
+        BUILDROOTS --> |"Root vault inputs"| CDOC
+        CDOC --> |"GET /{accountId}/vaults/{vaultId}/documents.json"| API8{Basecamp API}
+        API8 --> |"Paginated JSON\nLink header for next page"| RAW8[(raw: basecamp_documents)]
+        RAW8 --> EDOC[ExtractDocuments]
+        EDOC --> |"Parse JSON"| DOC[(BasecampDocument)]
+    end
+
     subgraph Convert["Domain Conversion"]
         PROJ --> CVTP[ConvertProjects]
         CVTP --> |"Transform"| BOARD[(ticket.Board)]
@@ -124,6 +145,11 @@ flowchart TD
         MATCH --> |"No"| SKIP2[Skip]
     end
 
+    %% Cross-subgraph sequencing
+    TODO2 --> VAULTCHECK
+    SKIPVAULTS --> CDOC
+    DOC --> CVTP
+
     BOARD --> DONE
     ICOMMENT --> DONE
     PRISSUE --> DONE
@@ -144,10 +170,10 @@ flowchart TD
     classDef config fill:#e0f2f1,stroke:#00695c,stroke-width:2px
     classDef cleanup fill:#ffebee,stroke:#c62828,stroke-width:2px
 
-    class CP,EP,CTL,ETL,CG,EG,CT,ET,CVTP,CVTT,CVTC,LINK,PREPARE,ITERATE,CC,EC,CEV,EEV,UTC task
-    class RAW1,RAW2,RAW3,RAW4,RAW5,RAW6,PROJ,TDL,GRP,TODO,TODO2,COMMENT,EVENT,TASKDATA,OPTS,CLIENT storage
-    class API1,API2,API3,API4A,API4B,API5,API6 api
-    class PROJFILTER,AGECHECK,PERMCHECK,DATECHECK,TODOAGECHECK,UPDATEDCHECK,REGEX,MATCH,FINDCOMP decision
+    class CP,EP,CTL,ETL,CG,EG,CT,ET,CVTP,CVTT,CVTC,LINK,PREPARE,ITERATE,CC,EC,CEV,EEV,UTC,CV,EV,CDOC,EDOC,BUILDROOTS task
+    class RAW1,RAW2,RAW3,RAW4,RAW5,RAW6,RAW7,RAW8,PROJ,TDL,GRP,TODO,TODO2,COMMENT,EVENT,VAULT,DOC,TASKDATA,OPTS,CLIENT storage
+    class API1,API2,API3,API4A,API4B,API5,API6,API7,API8 api
+    class PROJFILTER,AGECHECK,PERMCHECK,DATECHECK,TODOAGECHECK,UPDATEDCHECK,REGEX,MATCH,FINDCOMP,VAULTCHECK decision
     class BOARD,ISSUE,BISSUE,PRREF,PRISSUE,PRS,ICOMMENT domain
     class SCOPE,CUTOFF,TODOCUTOFF config
-    class CLEAN,DEL1,DEL2,DEL3,DEL4,DEL5,DEL6,DEL7 cleanup
+    class CLEAN,DEL1,DEL2,DEL3,DEL4,DEL5,DEL6 cleanup

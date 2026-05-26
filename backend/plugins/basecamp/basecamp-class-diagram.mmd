@@ -72,6 +72,7 @@ classDiagram
         +ProjectId string
         +Name string
         +TodosetIds string
+        +VaultIds string
         +CreatedAt *time.Time
         +TableName() string
     }
@@ -139,6 +140,28 @@ classDiagram
         +CreatorName string
         +CreatedAt *time.Time
         +Details string
+        +TableName() string
+    }
+
+    class BasecampDocument {
+        +ConnectionId uint64
+        +DocumentId string
+        +ProjectId string
+        +VaultId string
+        +Title string
+        +CreatorId string
+        +CreatorName string
+        +CreatorEmail string
+        +CreatedAt *time.Time
+        +UpdatedAt *time.Time
+        +TableName() string
+    }
+
+    class BasecampVault {
+        +ConnectionId uint64
+        +VaultId string
+        +ParentVaultId string
+        +Title string
         +TableName() string
     }
 
@@ -227,6 +250,26 @@ classDiagram
         +Recording RecordingRef
     }
 
+    class BasecampApiDocument {
+        <<api response>>
+        +ID int64
+        +Title string
+        +CreatedAt string
+        +UpdatedAt string
+        +Creator CreatorRef
+        +Bucket BucketRef
+        +Parent ParentRef
+    }
+
+    class BasecampApiVault {
+        <<api response>>
+        +ID int64
+        +Title string
+        +Parent ParentRef
+        +VaultsCount int
+        +DocumentsCount int
+    }
+
     %% ===== TOKEN MANAGEMENT =====
     class TokenProvider {
         -conn *BasecampConnection
@@ -270,6 +313,10 @@ classDiagram
         +ProjectId string
     }
 
+    class VaultInput {
+        +VaultId string
+    }
+
     %% ===== SUBTASKS =====
     class CleanupDataMeta {
         <<SubTaskMeta>>
@@ -277,6 +324,7 @@ classDiagram
         +EntryPoint: CleanupData
         +EnabledByDefault: true
         Note: Deletes existing data before sync
+        Note: Does NOT delete PrReferences
     }
 
     class CollectProjectsMeta {
@@ -375,6 +423,38 @@ classDiagram
         Note: Updates CompletedAt from events
     }
 
+    class CollectVaultsMeta {
+        <<SubTaskMeta>>
+        +Name: CollectVaults
+        +EntryPoint: CollectVaults
+        +EnabledByDefault: true
+        Note: Seeds from BasecampProject.VaultIds
+        Note: Recursive BFS via iterator closure
+    }
+
+    class ExtractVaultsMeta {
+        <<SubTaskMeta>>
+        +Name: ExtractVaults
+        +EntryPoint: ExtractVaults
+        +EnabledByDefault: true
+    }
+
+    class CollectDocumentsMeta {
+        <<SubTaskMeta>>
+        +Name: CollectDocuments
+        +EntryPoint: CollectDocuments
+        +EnabledByDefault: true
+        Note: Iterates root vaults and all sub-vaults
+        Note: Paginated; uses Link header for next page
+    }
+
+    class ExtractDocumentsMeta {
+        <<SubTaskMeta>>
+        +Name: ExtractDocuments
+        +EntryPoint: ExtractDocuments
+        +EnabledByDefault: true
+    }
+
     class ConvertProjectsMeta {
         <<SubTaskMeta>>
         +Name: convert_projects
@@ -437,6 +517,8 @@ classDiagram
     BasecampTodolistGroup --|> `common.NoPKModel` : embeds
     BasecampTodoComment --|> `common.NoPKModel` : embeds
     BasecampTodoEvent --|> `common.NoPKModel` : embeds
+    BasecampDocument --|> `common.NoPKModel` : embeds
+    BasecampVault --|> `common.NoPKModel` : embeds
     PrReference --|> `common.NoPKModel` : embeds
 
     %% ===== MODEL RELATIONSHIPS =====
@@ -448,6 +530,8 @@ classDiagram
     BasecampTodolistGroup "1" --> "*" BasecampTodo : contains
     BasecampTodo "1" --> "*" BasecampTodoComment : has
     BasecampTodo "1" --> "*" BasecampTodoEvent : has
+    BasecampProject "1" --> "*" BasecampVault : has sub-vaults
+    BasecampVault "1" --> "*" BasecampDocument : contains
 
     BasecampTaskData --> BasecampOptions : uses
     BasecampTaskData --> BasecampScopeConfig : uses
@@ -460,6 +544,9 @@ classDiagram
     CollectTodolistsMeta ..> BasecampScopeConfig : reads ProjectAgeLimitMonths
     CollectTodolistsMeta ..> BasecampScopeConfig : reads PermanentProjectIds
     ExtractTodosMeta ..> BasecampScopeConfig : reads TodoAgeLimitMonths
+    CollectVaultsMeta ..> BasecampProject : reads VaultIds
+    CollectDocumentsMeta ..> BasecampProject : reads VaultIds
+    CollectDocumentsMeta ..> BasecampVault : reads VaultId
 
     %% ===== PLUGIN TO SUBTASKS =====
     Basecamp --> CleanupDataMeta : registers
@@ -476,6 +563,10 @@ classDiagram
     Basecamp --> CollectEventsMeta : registers
     Basecamp --> ExtractEventsMeta : registers
     Basecamp --> UpdateTodoCompletionMeta : registers
+    Basecamp --> CollectVaultsMeta : registers
+    Basecamp --> ExtractVaultsMeta : registers
+    Basecamp --> CollectDocumentsMeta : registers
+    Basecamp --> ExtractDocumentsMeta : registers
     Basecamp --> ConvertProjectsMeta : registers
     Basecamp --> ConvertTodosMeta : registers
     Basecamp --> ConvertCommentsMeta : registers
@@ -495,7 +586,11 @@ classDiagram
     ExtractCommentsMeta ..> CollectEventsMeta : then
     CollectEventsMeta ..> ExtractEventsMeta : then
     ExtractEventsMeta ..> UpdateTodoCompletionMeta : then
-    UpdateTodoCompletionMeta ..> ConvertProjectsMeta : then
+    UpdateTodoCompletionMeta ..> CollectVaultsMeta : then
+    CollectVaultsMeta ..> ExtractVaultsMeta : then
+    ExtractVaultsMeta ..> CollectDocumentsMeta : then
+    CollectDocumentsMeta ..> ExtractDocumentsMeta : then
+    ExtractDocumentsMeta ..> ConvertProjectsMeta : then
     ConvertProjectsMeta ..> ConvertTodosMeta : then
     ConvertTodosMeta ..> ConvertCommentsMeta : then
     ConvertCommentsMeta ..> LinkPrToTodoMeta : then
@@ -514,6 +609,10 @@ classDiagram
     CollectEventsMeta ..> BasecampApiEvent : collects
     ExtractEventsMeta ..> BasecampTodoEvent : produces
     UpdateTodoCompletionMeta ..> BasecampTodo : updates CompletedAt
+    CollectVaultsMeta ..> BasecampApiVault : collects
+    ExtractVaultsMeta ..> BasecampVault : produces
+    CollectDocumentsMeta ..> BasecampApiDocument : collects
+    ExtractDocumentsMeta ..> BasecampDocument : produces
     LinkPrToTodoMeta ..> PrReference : produces
 
     %% ===== ITERATOR USAGE =====
@@ -522,3 +621,5 @@ classDiagram
     CollectTodosMeta ..> TodolistInput : iterates
     CollectCommentsMeta ..> TodoInput : iterates
     CollectEventsMeta ..> TodoInput : iterates
+    CollectVaultsMeta ..> VaultInput : iterates recursively
+    CollectDocumentsMeta ..> VaultInput : iterates

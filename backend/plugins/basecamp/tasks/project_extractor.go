@@ -78,20 +78,29 @@ func ExtractProjects(taskCtx plugin.SubTaskContext) errors.Error {
 
 			// Parse created_at timestamp
 			if apiProject.CreatedAt != "" {
-				if t, err := time.Parse(time.RFC3339, apiProject.CreatedAt); err == nil {
+				if t, err := time.Parse(time.RFC3339Nano, apiProject.CreatedAt); err == nil {
 					project.CreatedAt = &t
 				}
 			}
 
-			// Find all todoset IDs from the dock (projects can have multiple todosets)
-			var todosetIds []string
+			// Find all todoset and vault IDs from the dock
+			var todosetIds, vaultIds []string
 			for _, dock := range apiProject.Dock {
-				if dock.Name == "todoset" && dock.Enabled {
+				if !dock.Enabled {
+					continue
+				}
+				switch dock.Name {
+				case "todoset":
 					todosetIds = append(todosetIds, strconv.FormatInt(dock.ID, 10))
+				case "vault":
+					vaultIds = append(vaultIds, strconv.FormatInt(dock.ID, 10))
 				}
 			}
 			if len(todosetIds) > 0 {
 				project.TodosetIds = strings.Join(todosetIds, ",")
+			}
+			if len(vaultIds) > 0 {
+				project.VaultIds = strings.Join(vaultIds, ",")
 			}
 
 			return []interface{}{project}, nil

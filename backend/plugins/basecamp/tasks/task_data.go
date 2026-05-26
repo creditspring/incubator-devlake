@@ -18,6 +18,8 @@ limitations under the License.
 package tasks
 
 import (
+	"time"
+
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/basecamp/models"
 )
@@ -33,6 +35,17 @@ type BasecampTaskData struct {
 	ApiClient   *api.ApiAsyncClient
 	AccountId   string
 	ScopeConfig *models.BasecampScopeConfig
+	// Now is the clock function used for age-limit cutoff calculations.
+	// Tests set this to a fixed time; production leaves it nil (defaults to time.Now).
+	Now func() time.Time
+}
+
+// now returns the current time via the injected clock, falling back to time.Now.
+func (d *BasecampTaskData) now() time.Time {
+	if d.Now != nil {
+		return d.Now()
+	}
+	return time.Now()
 }
 
 type BasecampApiParams models.BasecampApiParams

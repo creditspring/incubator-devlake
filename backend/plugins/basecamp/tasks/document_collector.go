@@ -31,35 +31,46 @@ import (
 	"github.com/apache/incubator-devlake/plugins/basecamp/models"
 )
 
-const RAW_TODOLIST_TABLE = "basecamp_todolists"
+const RAW_DOCUMENT_TABLE = "basecamp_documents"
 
-var _ plugin.SubTaskEntryPoint = CollectTodolists
+var _ plugin.SubTaskEntryPoint = CollectDocuments
 
-var CollectTodolistsMeta = plugin.SubTaskMeta{
-	Name:             "CollectTodolists",
-	EntryPoint:       CollectTodolists,
+var CollectDocumentsMeta = plugin.SubTaskMeta{
+	Name:             "CollectDocuments",
+	EntryPoint:       CollectDocuments,
 	EnabledByDefault: true,
-	Description:      "Collect todolists from all projects in Basecamp account",
+	Description:      "Collect documents from all vaults in synced Basecamp projects",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }
 
-// ProjectInput represents a project to iterate over for collecting todolists
-type ProjectInput struct {
-	ProjectId string
-	TodosetId string
+// VaultInput holds the vault ID needed to collect documents from one vault.
+type VaultInput struct {
+	VaultId string
 }
 
-func CollectTodolists(taskCtx plugin.SubTaskContext) errors.Error {
+// buildVaultInputs converts a slice of projects into VaultInputs by splitting each project's VaultIds.
+func buildVaultInputs(projects []models.BasecampProject) []*VaultInput {
+	var inputs []*VaultInput
+	for _, p := range projects {
+		for _, id := range strings.Split(p.VaultIds, ",") {
+			if vaultId := strings.TrimSpace(id); vaultId != "" {
+				inputs = append(inputs, &VaultInput{VaultId: vaultId})
+			}
+		}
+	}
+	return inputs
+}
+
+func CollectDocuments(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*BasecampTaskData)
 	db := taskCtx.GetDal()
 
-	// Get project age limit from scope config (0 = no limit)
+	// Apply the same project age + permanent-ID filter as CollectTodolists
 	ageLimitMonths := 0
 	if data.ScopeConfig != nil && data.ScopeConfig.ProjectAgeLimitMonths > 0 {
 		ageLimitMonths = data.ScopeConfig.ProjectAgeLimitMonths
 	}
 
-	// Parse permanent project IDs from scope config
 	var permanentIds []string
 	if data.ScopeConfig != nil && data.ScopeConfig.PermanentProjectIds != "" {
 		for _, id := range strings.Split(data.ScopeConfig.PermanentProjectIds, ",") {
@@ -69,32 +80,29 @@ func CollectTodolists(taskCtx plugin.SubTaskContext) errors.Error {
 		}
 	}
 
-	// Query projects with todoset IDs
 	var projects []models.BasecampProject
 	var err errors.Error
 
-	// If age limit is 0, fetch all projects (no date filter)
 	if ageLimitMonths == 0 {
-		taskCtx.GetLogger().Info("No project age limit configured, collecting todolists from all projects")
+		taskCtx.GetLogger().Info("No project age limit configured, collecting documents from all projects")
 		err = db.All(&projects,
 			dal.From(&models.BasecampProject{}),
-			dal.Where("connection_id = ? AND todoset_ids != ''", data.Options.ConnectionId),
+			dal.Where("connection_id = ? AND vault_ids != ''", data.Options.ConnectionId),
 		)
 	} else {
 		cutoffDate := data.now().AddDate(0, -ageLimitMonths, 0)
 		taskCtx.GetLogger().Info("Project age limit: %d months (cutoff: %s)", ageLimitMonths, cutoffDate.Format("2006-01-02"))
 
 		if len(permanentIds) > 0 {
-			taskCtx.GetLogger().Info("Including %d permanent project IDs in todolist collection", len(permanentIds))
 			err = db.All(&projects,
 				dal.From(&models.BasecampProject{}),
-				dal.Where("connection_id = ? AND todoset_ids != '' AND (created_at > ? OR project_id IN ?)",
+				dal.Where("connection_id = ? AND vault_ids != '' AND (created_at > ? OR project_id IN ?)",
 					data.Options.ConnectionId, cutoffDate, permanentIds),
 			)
 		} else {
 			err = db.All(&projects,
 				dal.From(&models.BasecampProject{}),
-				dal.Where("connection_id = ? AND todoset_ids != '' AND created_at > ?",
+				dal.Where("connection_id = ? AND vault_ids != '' AND created_at > ?",
 					data.Options.ConnectionId, cutoffDate),
 			)
 		}
@@ -103,24 +111,31 @@ func CollectTodolists(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	if len(projects) == 0 {
-		taskCtx.GetLogger().Info("No projects with todosets found matching criteria, skipping todolist collection")
+	rootVaults := buildVaultInputs(projects)
+
+	// Also include sub-vaults discovered by CollectVaults
+	var subVaults []models.BasecampVault
+	if err := db.All(&subVaults,
+		dal.From(&models.BasecampVault{}),
+		dal.Where("connection_id = ?", data.Options.ConnectionId),
+	); err != nil {
+		return err
+	}
+
+	totalVaults := len(rootVaults) + len(subVaults)
+	if totalVaults == 0 {
+		taskCtx.GetLogger().Info("No vaults found in synced projects, skipping document collection")
 		return nil
 	}
 
-	taskCtx.GetLogger().Info("Collecting todolists from %d projects", len(projects))
+	taskCtx.GetLogger().Info("Collecting documents from %d root vaults and %d sub-vaults", len(rootVaults), len(subVaults))
 
-	// Create iterator from projects - iterate over ALL todosets per project
 	iterator := api.NewQueueIterator()
-	for _, p := range projects {
-		for _, id := range strings.Split(p.TodosetIds, ",") {
-			if todosetId := strings.TrimSpace(id); todosetId != "" {
-				iterator.Push(&ProjectInput{
-					ProjectId: p.ProjectId,
-					TodosetId: todosetId,
-				})
-			}
-		}
+	for _, v := range rootVaults {
+		iterator.Push(v)
+	}
+	for _, v := range subVaults {
+		iterator.Push(&VaultInput{VaultId: v.VaultId})
 	}
 
 	collector, err := api.NewApiCollector(api.ApiCollectorArgs{
@@ -130,16 +145,15 @@ func CollectTodolists(taskCtx plugin.SubTaskContext) errors.Error {
 				ConnectionId: data.Options.ConnectionId,
 				AccountId:    data.AccountId,
 			},
-			Table: RAW_TODOLIST_TABLE,
+			Table: RAW_DOCUMENT_TABLE,
 		},
 		ApiClient: data.ApiClient,
 		Input:     iterator,
-		PageSize:  15, // Basecamp returns 15 items per page
-		UrlTemplate: fmt.Sprintf("%s/buckets/{{ .Input.ProjectId }}/todosets/{{ .Input.TodosetId }}/todolists.json",
+		PageSize:  15,
+		UrlTemplate: fmt.Sprintf("%s/vaults/{{ .Input.VaultId }}/documents.json",
 			data.AccountId),
 		Query: func(reqData *api.RequestData) (url.Values, errors.Error) {
 			query := url.Values{}
-			// Use page number from CustomData if available (for pagination)
 			if reqData.CustomData != nil {
 				if page, ok := reqData.CustomData.(int); ok && page > 1 {
 					query.Set("page", fmt.Sprintf("%d", page))
@@ -148,22 +162,19 @@ func CollectTodolists(taskCtx plugin.SubTaskContext) errors.Error {
 			return query, nil
 		},
 		GetNextPageCustomData: func(prevReqData *api.RequestData, prevPageResponse *http.Response) (interface{}, errors.Error) {
-			// Check Link header for next page URL
 			nextURL := GetNextPageURL(prevPageResponse)
 			if nextURL == "" {
 				return nil, api.ErrFinishCollect
 			}
-			// Return the next page number
-			nextPage := prevReqData.Pager.Page + 1
-			return nextPage, nil
+			return prevReqData.Pager.Page + 1, nil
 		},
 		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
-			var todolists []json.RawMessage
-			err := api.UnmarshalResponse(res, &todolists)
+			var documents []json.RawMessage
+			err := api.UnmarshalResponse(res, &documents)
 			if err != nil {
 				return nil, err
 			}
-			return todolists, nil
+			return documents, nil
 		},
 	})
 
